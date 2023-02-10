@@ -1,6 +1,6 @@
-body{   
-    background-image: url('images/705836.jpg');
-  
+main{
+    background-color: black;
+    font: white;
 }
 h1{
     font-family: 'Courier New', 'Courier New', Courier, monospace;
