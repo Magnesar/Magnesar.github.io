@@ -1,13 +1,21 @@
+body:{
+    background-image: url('images/705836.jpg');
+    padding:20px;
+}
+
 main{
     background-color: black;
     color: white;
 }
+
 h1{
     font-family: 'Courier New', 'Courier New', Courier, monospace;
 }
+
 main{
     font-family: 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
 }
+
 h2{
     font-family: 'Brush Script MT', cursive;
 }
