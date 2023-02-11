@@ -2,6 +2,10 @@ body{
     background-image: url('images/705836.jpg');
     padding:20px;
 }
+div{
+    background-color: black;
+    color: white;
+}
 
 h1{
     font-family: 'Courier New', 'Courier New', Courier, monospace;
