@@ -154,16 +154,16 @@ async function insertTasks(source, themeIds, sourceThemes = themes) {
     const subtasks = source[index].subtasks.map((item, position) => ({ user_id: currentUser.id, task_id: data[index].id, text: item.text, done: item.done, position, notes: item.notes || "", due_date: item.date || null, color: item.color || "sage" }));
     if (subtasks.length) await insertSubtasks(subtasks);
   }
-  async function insertSubtasks(rows) {
-    let result = await supabaseClient.from("subtasks").insert(rows).select();
-    if (result.error?.code === "PGRST204" || result.error?.message?.includes("column")) {
-      const legacyRows = rows.map(({ user_id, task_id, text, done, position }) => ({ user_id, task_id, text, done, position }));
-      result = await supabaseClient.from("subtasks").insert(legacyRows).select();
-    }
-    if (result.error) throw result.error;
-    return result.data;
-  }
   return data.map((task, index) => ({ id: task.id, themeId: task.theme_id, title: task.title, status: task.status, color: task.color, date: task.due_date, notes: task.notes, completedAt: task.status === "completed" ? (source[index].completedAt || new Date().toISOString()) : null, subtasks: source[index].subtasks }));
+}
+async function insertSubtasks(rows) {
+  let result = await supabaseClient.from("subtasks").insert(rows).select();
+  if (result.error?.code === "PGRST204" || result.error?.message?.includes("column")) {
+    const legacyRows = rows.map(({ user_id, task_id, text, done, position }) => ({ user_id, task_id, text, done, position }));
+    result = await supabaseClient.from("subtasks").insert(legacyRows).select();
+  }
+  if (result.error) throw result.error;
+  return result.data;
 }
 async function saveTask(task, existing) {
   const row = { user_id: currentUser.id, theme_id: task.themeId, title: task.title, status: task.status, color: task.color, due_date: task.date || null, notes: task.notes, image_path: task.imagePath || null, position: task.position ?? 0, completed_at: task.status === "completed" ? (task.completedAt || new Date().toISOString()) : null };
