@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="A local theme-based scheduler with subtasks, Markdown notes, equations, and images." />
+    <meta name="theme-color" content="#315c4d" />
+    <title>Research & Life — Scheduler</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <section id="auth-screen" class="auth-screen">
+      <div class="auth-card">
+        <span class="brand-mark">✦</span>
+        <p class="eyebrow">PRIVATE WORKSPACE</p>
+        <h1>Research &amp; Life</h1>
+        <p>Sign in to sync your themes, tasks, notes, and images across your devices.</p>
+        <form id="auth-form">
+          <label class="field">Email<input id="auth-email" type="email" required autocomplete="email" /></label>
+          <label class="field">Password<input id="auth-password" type="password" required minlength="6" autocomplete="current-password" /></label>
+          <button class="button button-primary" type="submit">Sign in</button>
+          <button class="text-button" id="auth-signup" type="button">Create account</button>
+          <p id="auth-message" class="auth-message" role="status"></p>
+        </form>
+      </div>
+    </section>
+    <div id="app-container" hidden>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark">✦</span>
+          <div>
+            <p class="eyebrow">LOCAL RESEARCH DESK</p>
+            <h1>Research & Life <span>scheduler</span></h1>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <label class="search">
+            <span>⌕</span>
+            <input id="search-input" type="search" placeholder="Search tasks..." />
+          </label>
+          <button id="new-task-button" class="button button-primary">+ New task</button>
+          <button id="sign-out-button" class="text-button">Sign out</button>
+        </div>
+      </header>
+
+      <section class="intro">
+        <div>
+          <p class="eyebrow">YOUR WHOLE LIFE, IN ONE VIEW</p>
+          <h2>Make space for <em>what matters.</em></h2>
+          <p class="intro-copy">Group your work into broad themes, then break each theme into cards. Open any card to reveal its working notes and subtasks.</p>
+        </div>
+        <div class="stats" aria-label="Task statistics">
+          <div><strong id="task-count">0</strong><span>active cards</span></div>
+          <div><strong id="progress-count">0%</strong><span>completed</span></div>
+        </div>
+      </section>
+
+      <nav class="filters" aria-label="Task filters">
+        <button class="filter active" data-filter="all">All work</button>
+        <button class="filter" data-filter="in-progress">In progress</button>
+        <button class="filter" data-filter="planned">Planned</button>
+        <button class="filter" data-filter="completed">Completed</button>
+        <span class="filter-divider"></span>
+        <span class="hint">Tip: click a card to open its notes and subtasks</span>
+      </nav>
+
+      <section id="theme-tabs" class="theme-tabs" aria-label="Themes"></section>
+      <section id="task-board" class="task-board" aria-live="polite"></section>
+      <section id="empty-state" class="empty-state" hidden>
+        <div class="empty-icon">⌁</div>
+        <h3>No matching cards</h3>
+        <p>Try another filter or create a new task to start mapping your life.</p>
+        <button class="button button-secondary" id="empty-new-task">Create a task</button>
+      </section>
+    </main>
+    </div>
+
+    <dialog id="task-dialog" class="task-dialog">
+      <form id="task-form" method="dialog">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow" id="dialog-eyebrow">NEW TASK CARD</p>
+            <h2 id="dialog-title">Create a task</h2>
+          </div>
+          <button type="button" class="icon-button" id="close-dialog" aria-label="Close">×</button>
+        </div>
+        <input type="hidden" id="task-id" />
+        <div class="form-grid">
+          <label class="field field-wide">Title<input id="task-title" required maxlength="100" placeholder="What are you working on?" /></label>
+          <label class="field field-wide">Theme
+            <select id="task-theme"></select>
+          </label>
+          <label class="field">Status
+            <select id="task-status">
+              <option value="planned">Planned</option>
+              <option value="in-progress">In progress</option>
+              <option value="completed">Completed</option>
+            </select>
+          </label>
+          <label class="field">Accent
+            <select id="task-color">
+              <option value="sun">Sun</option>
+              <option value="sage">Sage</option>
+              <option value="lavender">Lavender</option>
+              <option value="coral">Coral</option>
+              <option value="blue">Blue</option>
+            </select>
+          </label>
+          <label class="field field-wide">Due date<input id="task-date" type="date" /></label>
+          <label class="field field-wide">Notes <span class="field-help">Markdown + LaTeX supported</span>
+            <textarea id="task-notes" rows="6" placeholder="Add context, references, or a hypothesis...&#10;&#10;Inline equation: $E = mc^2$&#10;Image: ![caption](image-url)"></textarea>
+          </label>
+        </div>
+        <div class="image-upload">
+          <div>
+            <strong>Attach an image</strong>
+            <span id="image-name">PNG, JPG, GIF, or WebP · stored locally</span>
+          </div>
+          <label class="button button-small">Choose image<input id="task-image" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden /></label>
+          <button type="button" id="remove-image" class="text-button" hidden>Remove</button>
+        </div>
+        <div class="dialog-actions">
+          <button type="button" id="delete-task" class="text-button danger" hidden>Delete card</button>
+          <span></span>
+          <button type="button" class="button button-secondary" id="cancel-dialog">Cancel</button>
+          <button type="submit" class="button button-primary">Save card</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="detail-dialog" class="detail-dialog">
+      <div id="detail-content"></div>
+    </dialog>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js"></script>
+    <script>
+      if ("serviceWorker" in navigator && (location.protocol === "http:" || location.protocol === "https:")) {
+        navigator.serviceWorker.register("./service-worker.js");
+      }
+    </script>
+  </body>
+</html>

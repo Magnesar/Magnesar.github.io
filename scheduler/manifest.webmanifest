@@ -1,0 +1,11 @@
+{
+  "name": "Research & Life Scheduler",
+  "short_name": "Scheduler",
+  "description": "A theme-based scheduler for research, hobbies, and everyday life.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f8f3",
+  "theme_color": "#315c4d",
+  "icons": []
+}
