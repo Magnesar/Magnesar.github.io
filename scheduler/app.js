@@ -18,7 +18,7 @@ const starterTasks = [
   { id: "books", themeId: "hobbies", title: "Books", status: "planned", color: "sun", date: "2026-10-25", notes: "Keep a small reading queue and capture one idea from each book.", subtasks: [{ text: "Choose the next book", done: false }, { text: "Write a reading note", done: false }] }
 ];
 
-let themes = [], tasks = [], currentUser = null, activeFilter = "all", activeTheme = "all", searchTerm = "", imageData = "";
+let themes = [], tasks = [], currentUser = null, activeFilter = "all", activeTheme = "all", searchTerm = "", imageData = "", bootPromise = null;
 const $ = (selector) => document.querySelector(selector);
 const board = $("#task-board"), taskDialog = $("#task-dialog"), detailDialog = $("#detail-dialog");
 
@@ -64,13 +64,27 @@ async function loadCloudData() {
     const seed = localSeed();
     const insertedThemes = await insertThemes(seed.themes);
     const themeIds = new Map(insertedThemes.map((theme) => [theme.name, theme.id]));
-    const insertedTasks = await insertTasks(seed.tasks, themeIds);
+    const insertedTasks = await insertTasks(seed.tasks, themeIds, seed.themes);
     themes = insertedThemes; tasks = insertedTasks;
   } else {
-    themes = themeResult.data.map(({ id, name, icon, color, description }) => ({ id, name, icon, color, description }));
+    themes = dedupeThemes(themeResult.data.map(({ id, name, icon, color, description }) => ({ id, name, icon, color, description })));
     tasks = taskResult.data.map((task) => ({ id: task.id, themeId: task.theme_id, title: task.title, status: task.status, color: task.color, date: task.due_date, notes: task.notes, imagePath: task.image_path, subtasks: (task.subtasks || []).sort((a, b) => a.position - b.position).map(({ id, text, done }) => ({ id, text, done })) }));
+    if (!tasks.length) {
+      const seed = localSeed();
+      const themeIds = new Map(themes.map((theme) => [theme.name, theme.id]));
+      tasks = await insertTasks(seed.tasks, themeIds, seed.themes);
+    }
   }
   persistLocal(); render();
+}
+function dedupeThemes(source) {
+  const seen = new Set();
+  return source.filter((theme) => {
+    const key = theme.name.trim().toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 async function insertThemes(source) {
   const rows = source.map((theme) => ({ user_id: currentUser.id, name: theme.name, icon: theme.icon, color: theme.color, description: theme.description || "" }));
@@ -78,8 +92,11 @@ async function insertThemes(source) {
   if (error) throw error;
   return data;
 }
-async function insertTasks(source, themeIds) {
-  const rows = source.map((task) => ({ user_id: currentUser.id, theme_id: themeIds.get(themes.find((theme) => theme.id === task.themeId)?.name || task.themeId), title: task.title, status: task.status, color: task.color, due_date: task.date || null, notes: task.notes || "" }));
+async function insertTasks(source, themeIds, sourceThemes = themes) {
+  const rows = source.map((task) => {
+    const theme = sourceThemes.find((item) => item.id === task.themeId);
+    return { user_id: currentUser.id, theme_id: themeIds.get(theme?.name || task.themeId), title: task.title, status: task.status, color: task.color, due_date: task.date || null, notes: task.notes || "" };
+  }).filter((task) => task.theme_id);
   const { data, error } = await supabaseClient.from("tasks").insert(rows).select();
   if (error) throw error;
   for (let index = 0; index < data.length; index += 1) {
@@ -146,8 +163,12 @@ async function addTheme() {
 }
 
 async function boot(session) {
-  currentUser = session.user; showApp();
-  try { await loadCloudData(); } catch (error) { const seed = localSeed(); themes = seed.themes; tasks = seed.tasks; persistLocal(); render(); alert(`Supabase could not be reached, so local data is shown. ${error.message}`); }
+  if (bootPromise) return bootPromise;
+  bootPromise = (async () => {
+    currentUser = session.user; showApp();
+    try { await loadCloudData(); } catch (error) { const seed = localSeed(); themes = seed.themes; tasks = seed.tasks; persistLocal(); render(); alert(`Supabase could not be reached, so local data is shown. ${error.message}`); }
+  })();
+  return bootPromise;
 }
 $("#auth-form").addEventListener("submit", signIn); $("#auth-signup").addEventListener("click", signUp);
 $("#sign-out-button").addEventListener("click", async () => { await supabaseClient.auth.signOut(); location.reload(); });
