@@ -61,7 +61,7 @@
         <button class="filter active" data-filter="all">All work</button>
         <button class="filter" data-filter="in-progress">In progress</button>
         <button class="filter" data-filter="planned">Planned</button>
-        <button class="filter" data-filter="completed">Completed</button>
+        <button class="archive-toggle" id="archive-toggle" type="button">Archive <span id="archive-count">0</span></button>
         <span class="filter-divider"></span>
         <span class="hint">Tip: click a card to open its notes and subtasks</span>
       </nav>
@@ -134,7 +134,7 @@
       <div id="detail-content"></div>
     </dialog>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=5"></script>
     <script>
       if ("serviceWorker" in navigator && (location.protocol === "http:" || location.protocol === "https:")) {
         navigator.serviceWorker.register("./service-worker.js");

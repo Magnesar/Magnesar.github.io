@@ -44,4 +44,16 @@ Sign in with the same scheduler account on each device. The first successful sig
 
 The frontend must contain only the project URL and publishable/anon key. Never add the `service_role` key, secret key, database password, or GitHub token to these files.
 
+## Archive
+
+Completed cards leave the active board and appear under **Archive**, grouped by completion month. Within an open task, completed subtasks move into a collapsed **Completed subtasks** section, keeping the active checklist focused. Restoring a card is done by opening it from the archive and changing its status back to Planned or In progress.
+
+For exact completion dates across devices, run this optional Supabase migration once:
+
+```sql
+alter table public.tasks add column if not exists completed_at timestamptz;
+```
+
+The app has a fallback for projects where this column has not yet been added, using the task's update timestamp.
+
 Browser storage can also be cleared by browser settings. Image attachments should be kept reasonably small.
