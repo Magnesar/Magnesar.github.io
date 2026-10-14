@@ -62,6 +62,8 @@ Cards can be dragged within a theme to change their urgency/order. To sync that 
 alter table public.tasks add column if not exists position integer not null default 0;
 ```
 
+Exact duplicate task titles within the same theme are automatically consolidated on cloud load; dragging a card does not create a new task.
+
 For exact completion dates across devices, run this optional Supabase migration once:
 
 ```sql

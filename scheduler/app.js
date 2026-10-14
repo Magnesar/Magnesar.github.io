@@ -84,7 +84,8 @@ async function loadCloudData() {
     rawThemes.forEach((theme) => { const key = theme.name.trim().toLowerCase(); if (!canonicalThemes.has(key)) canonicalThemes.set(key, theme); });
     const themeIdMap = new Map(rawThemes.map((theme) => [theme.id, canonicalThemes.get(theme.name.trim().toLowerCase()).id]));
     themes = [...canonicalThemes.values()];
-    tasks = taskResult.data.map((task, index) => ({ id: task.id, themeId: themeIdMap.get(task.theme_id) || task.theme_id, title: task.title, status: task.status, color: task.color, date: task.due_date, notes: task.notes, imagePath: task.image_path, position: task.position ?? index, completedAt: task.completed_at || (task.status === "completed" ? task.updated_at : null), subtasks: (task.subtasks || []).sort((a, b) => a.position - b.position).map(({ id, text, done, notes, due_date, color }) => ({ id, text, done, notes: notes || "", date: due_date || "", color: color || "sage" })) }));
+    const loadedTasks = taskResult.data.map((task, index) => ({ id: task.id, themeId: themeIdMap.get(task.theme_id) || task.theme_id, title: task.title, status: task.status, color: task.color, date: task.due_date, notes: task.notes, imagePath: task.image_path, position: task.position ?? index, createdAt: task.created_at, completedAt: task.completed_at || (task.status === "completed" ? task.updated_at : null), subtasks: (task.subtasks || []).sort((a, b) => a.position - b.position).map(({ id, text, done, notes, due_date, color }) => ({ id, text, done, notes: notes || "", date: due_date || "", color: color || "sage" })) }));
+    tasks = await dedupeCloudTasks(loadedTasks);
     if (!tasks.length) {
       const seed = localSeed();
       const themeIds = new Map(themes.map((theme) => [theme.name, theme.id]));
@@ -93,6 +94,24 @@ async function loadCloudData() {
   }
   await ensureStarterContent();
   persistLocal(); render();
+}
+async function dedupeCloudTasks(source) {
+  const seen = new Set();
+  const duplicateIds = [];
+  const unique = source.filter((task) => {
+    const key = `${task.themeId}:${task.title.trim().toLowerCase()}`;
+    if (seen.has(key)) {
+      duplicateIds.push(task.id);
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+  if (duplicateIds.length) {
+    const { error } = await supabaseClient.from("tasks").delete().in("id", duplicateIds);
+    if (error) throw error;
+  }
+  return unique;
 }
 async function ensureStarterContent() {
   const existingThemeNames = new Set(themes.map((theme) => theme.name.toLowerCase()));
