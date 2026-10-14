@@ -5,7 +5,8 @@ const STORAGE_KEY = "research-life-scheduler-v2";
 const LEGACY_STORAGE_KEY = "atlas-research-scheduler-v1";
 const starterThemes = [
   { id: "research", name: "Research", icon: "⌘", color: "sage", description: "Questions, papers, experiments, and writing." },
-  { id: "hobbies", name: "Hobbies", icon: "✦", color: "lavender", description: "Things you do simply because they make life richer." }
+  { id: "hobbies", name: "Hobbies", icon: "✦", color: "lavender", description: "Things you do simply because they make life richer." },
+  { id: "skill", name: "Skill", icon: "↗", color: "blue", description: "Skills and capabilities you are deliberately building." }
 ];
 const starterTasks = [
   { id: "lit-review", themeId: "research", title: "Literature review", status: "in-progress", color: "sage", date: "2026-10-22", notes: "Synthesize the main arguments around **spatial memory** and identify the gap my work can address.\n\nWorking equation: $R = f(S, T, C)$", subtasks: [{ text: "Collect the five foundational papers", done: true }, { text: "Build an annotated bibliography", done: false }, { text: "Write the gap statement", done: false }] },
@@ -13,14 +14,29 @@ const starterTasks = [
   { id: "conference", themeId: "research", title: "Paper work", status: "planned", color: "lavender", date: "2026-11-05", notes: "A 300-word abstract connecting the theoretical frame to the preliminary results.", subtasks: [{ text: "Choose a working title", done: false }, { text: "Draft the methods paragraph", done: false }, { text: "Ask for supervisor feedback", done: false }] },
   { id: "analysis", themeId: "research", title: "Analyse pilot data", status: "completed", color: "coral", date: "2026-10-16", notes: "Check the first pass for outliers and make a note of any assumptions.", subtasks: [{ text: "Clean the data", done: true }, { text: "Run descriptive statistics", done: true }] },
   { id: "reading", themeId: "research", title: "Read & annotate", status: "in-progress", color: "blue", date: "2026-10-19", notes: "Read the new paper on embodied cognition. Capture useful quotations and questions.", subtasks: [{ text: "Read introduction", done: true }, { text: "Annotate figures", done: false }] },
+  { id: "positive-negative-heat-flux", themeId: "research", title: "Positive-Negative Heat flux", status: "planned", color: "crimson", date: "", notes: "Study the positive-negative heat flux behavior and organize the sign conventions.", subtasks: [{ text: "Define the sign convention", done: false }, { text: "Compare the flux profiles", done: false }] },
+  { id: "counter-gradient-heat-flux", themeId: "research", title: "Counter Gradient Heat flux", status: "planned", color: "amber", date: "", notes: "Investigate counter-gradient transport and its relationship to the mean scalar gradient.", subtasks: [{ text: "Review the relevant closure model", done: false }, { text: "Plot the counter-gradient region", done: false }] },
+  { id: "poisson-equation", themeId: "research", title: "Poisson Equation", status: "planned", color: "blue", date: "", notes: "Work through the Poisson equation formulation used in the project.", subtasks: [{ text: "Write the boundary conditions", done: false }, { text: "Check the numerical solver", done: false }] },
+  { id: "rotational-rbc", themeId: "research", title: "Rotational RBC", status: "planned", color: "teal", date: "", notes: "Organize the rotating Rayleigh-Bénard convection analysis.", subtasks: [{ text: "Cross correlation", done: false }, { text: "Review the rotation parameter", done: false }] },
+  { id: "quasi-2d", themeId: "research", title: "Quasi 2D", status: "planned", color: "sage", date: "", notes: "Clarify the quasi-two-dimensional approximation and its limits.", subtasks: [{ text: "List the assumptions", done: false }, { text: "Compare with the full model", done: false }] },
+  { id: "interpolation-script", themeId: "research", title: "Interpolation script", status: "planned", color: "lavender", date: "", notes: "Finish and test the interpolation workflow.", subtasks: [{ text: "Choose interpolation method", done: false }, { text: "Test edge cases", done: false }] },
+  { id: "grossman-lohse", themeId: "research", title: "Grossman Lohse parameters", status: "planned", color: "plum", date: "", notes: "Collect and compare the Grossmann–Lohse parameters relevant to the study.", subtasks: [{ text: "List the parameter definitions", done: false }, { text: "Compare the scaling regimes", done: false }] },
   { id: "running", themeId: "hobbies", title: "Running", status: "in-progress", color: "coral", date: "2026-10-18", notes: "Build a steady weekly rhythm and enjoy being outside.", subtasks: [{ text: "Easy 5 km run", done: true }, { text: "Stretch and recover", done: false }] },
   { id: "music", themeId: "hobbies", title: "Music", status: "planned", color: "lavender", date: "2026-10-20", notes: "Make time to listen deeply and practice.", subtasks: [{ text: "Practice for 20 minutes", done: false }, { text: "Listen to one full album", done: false }] },
   { id: "books", themeId: "hobbies", title: "Books", status: "planned", color: "sun", date: "2026-10-25", notes: "Keep a small reading queue and capture one idea from each book.", subtasks: [{ text: "Choose the next book", done: false }, { text: "Write a reading note", done: false }] }
+  ,{ id: "chess", themeId: "hobbies", title: "Chess", status: "planned", color: "teal", date: "", notes: "Build a regular practice habit and review games.", subtasks: [{ text: "Play one slow game", done: false }, { text: "Review the opening", done: false }] }
+  ,{ id: "art", themeId: "hobbies", title: "Art", status: "planned", color: "plum", date: "", notes: "Keep a low-pressure visual practice.", subtasks: [{ text: "Make one small study", done: false }] }
+  ,{ id: "metamorphosis", themeId: "hobbies", title: "Metamorphosis by Kafka", status: "planned", color: "amber", date: "", notes: "Read and capture the ideas that stay with me.", subtasks: [{ text: "Read the first section", done: false }, { text: "Write a short reflection", done: false }] }
+  ,{ id: "sylvia-plath", themeId: "hobbies", title: "Sylvia Plath poems", status: "planned", color: "plum", date: "", notes: "Read slowly and collect images, lines, and questions.", subtasks: [{ text: "Choose a small set of poems", done: false }, { text: "Write a reading note", done: false }] }
+  ,{ id: "kafka-short-stories", themeId: "hobbies", title: "Short stories by Kafka", status: "planned", color: "blue", date: "", notes: "Explore the short fiction alongside Metamorphosis.", subtasks: [{ text: "Choose the first story", done: false }, { text: "Compare its central image", done: false }] }
+  ,{ id: "vagabond", themeId: "hobbies", title: "Vagabond", status: "planned", color: "coral", date: "", notes: "Make time for the series and keep a few observations.", subtasks: [{ text: "Watch the next episode", done: false }] }
+  ,{ id: "cybersecurity", themeId: "skill", title: "Cybersecurity", status: "planned", color: "teal", date: "", notes: "Build practical security knowledge through small, consistent exercises.", subtasks: [{ text: "Choose a fundamentals path", done: false }, { text: "Set up a safe practice lab", done: false }] }
 ];
 
 let themes = [], tasks = [], currentUser = null, activeFilter = "all", activeTheme = "all", searchTerm = "", imageData = "", bootPromise = null, showingArchive = false;
 const $ = (selector) => document.querySelector(selector);
-const board = $("#task-board"), taskDialog = $("#task-dialog"), detailDialog = $("#detail-dialog");
+const board = $("#task-board"), taskDialog = $("#task-dialog"), detailDialog = $("#detail-dialog"), subtaskDialog = $("#subtask-dialog");
+let openSubtaskContext = null;
 
 function escapeHtml(value) { return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char])); }
 function formatDate(date) { if (!date) return "No due date"; return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(`${date}T12:00:00`)); }
@@ -67,15 +83,32 @@ async function loadCloudData() {
     const insertedTasks = await insertTasks(seed.tasks, themeIds, seed.themes);
     themes = insertedThemes; tasks = insertedTasks;
   } else {
-    themes = dedupeThemes(themeResult.data.map(({ id, name, icon, color, description }) => ({ id, name, icon, color, description })));
-    tasks = taskResult.data.map((task) => ({ id: task.id, themeId: task.theme_id, title: task.title, status: task.status, color: task.color, date: task.due_date, notes: task.notes, imagePath: task.image_path, completedAt: task.completed_at || (task.status === "completed" ? task.updated_at : null), subtasks: (task.subtasks || []).sort((a, b) => a.position - b.position).map(({ id, text, done }) => ({ id, text, done })) }));
+    const rawThemes = themeResult.data.map(({ id, name, icon, color, description }) => ({ id, name, icon, color, description }));
+    const canonicalThemes = new Map();
+    rawThemes.forEach((theme) => { const key = theme.name.trim().toLowerCase(); if (!canonicalThemes.has(key)) canonicalThemes.set(key, theme); });
+    const themeIdMap = new Map(rawThemes.map((theme) => [theme.id, canonicalThemes.get(theme.name.trim().toLowerCase()).id]));
+    themes = [...canonicalThemes.values()];
+    tasks = taskResult.data.map((task) => ({ id: task.id, themeId: themeIdMap.get(task.theme_id) || task.theme_id, title: task.title, status: task.status, color: task.color, date: task.due_date, notes: task.notes, imagePath: task.image_path, completedAt: task.completed_at || (task.status === "completed" ? task.updated_at : null), subtasks: (task.subtasks || []).sort((a, b) => a.position - b.position).map(({ id, text, done, notes, due_date, color }) => ({ id, text, done, notes: notes || "", date: due_date || "", color: color || "sage" })) }));
     if (!tasks.length) {
       const seed = localSeed();
       const themeIds = new Map(themes.map((theme) => [theme.name, theme.id]));
       tasks = await insertTasks(seed.tasks, themeIds, seed.themes);
     }
   }
+  await ensureStarterContent();
   persistLocal(); render();
+}
+async function ensureStarterContent() {
+  const existingThemeNames = new Set(themes.map((theme) => theme.name.toLowerCase()));
+  const missingThemes = starterThemes.filter((theme) => !existingThemeNames.has(theme.name.toLowerCase()));
+  if (missingThemes.length) {
+    const inserted = await insertThemes(missingThemes);
+    themes = themes.concat(inserted);
+  }
+  const themeIds = new Map(themes.map((theme) => [theme.name, theme.id]));
+  const existingTitles = new Set(tasks.map((task) => task.title.toLowerCase()));
+  const missingTasks = starterTasks.filter((task) => !existingTitles.has(task.title.toLowerCase()));
+  if (missingTasks.length) tasks = tasks.concat(await insertTasks(missingTasks, themeIds, starterThemes));
 }
 function dedupeThemes(source) {
   const seen = new Set();
@@ -97,11 +130,24 @@ async function insertTasks(source, themeIds, sourceThemes = themes) {
     const theme = sourceThemes.find((item) => item.id === task.themeId);
     return { user_id: currentUser.id, theme_id: themeIds.get(theme?.name || task.themeId), title: task.title, status: task.status, color: task.color, due_date: task.date || null, notes: task.notes || "", completed_at: task.status === "completed" ? (task.completedAt || new Date().toISOString()) : null };
   }).filter((task) => task.theme_id);
-  const { data, error } = await supabaseClient.from("tasks").insert(rows).select();
+  let { data, error } = await supabaseClient.from("tasks").insert(rows).select();
+  if (error?.code === "PGRST204" || error?.message?.includes("completed_at")) {
+    const legacyRows = rows.map(({ user_id, theme_id, title, status, color, due_date, notes, image_path }) => ({ user_id, theme_id, title, status, color, due_date, notes, image_path }));
+    ({ data, error } = await supabaseClient.from("tasks").insert(legacyRows).select());
+  }
   if (error) throw error;
   for (let index = 0; index < data.length; index += 1) {
-    const subtasks = source[index].subtasks.map((item, position) => ({ user_id: currentUser.id, task_id: data[index].id, text: item.text, done: item.done, position }));
-    if (subtasks.length) { const result = await supabaseClient.from("subtasks").insert(subtasks); if (result.error) throw result.error; }
+    const subtasks = source[index].subtasks.map((item, position) => ({ user_id: currentUser.id, task_id: data[index].id, text: item.text, done: item.done, position, notes: item.notes || "", due_date: item.date || null, color: item.color || "sage" }));
+    if (subtasks.length) await insertSubtasks(subtasks);
+  }
+  async function insertSubtasks(rows) {
+    let result = await supabaseClient.from("subtasks").insert(rows).select();
+    if (result.error?.code === "PGRST204" || result.error?.message?.includes("column")) {
+      const legacyRows = rows.map(({ user_id, task_id, text, done, position }) => ({ user_id, task_id, text, done, position }));
+      result = await supabaseClient.from("subtasks").insert(legacyRows).select();
+    }
+    if (result.error) throw result.error;
+    return result.data;
   }
   return data.map((task, index) => ({ id: task.id, themeId: task.theme_id, title: task.title, status: task.status, color: task.color, date: task.due_date, notes: task.notes, completedAt: task.status === "completed" ? (source[index].completedAt || new Date().toISOString()) : null, subtasks: source[index].subtasks }));
 }
@@ -115,9 +161,8 @@ async function saveTask(task, existing) {
   if (result.error) throw result.error;
   task.id = result.data.id;
   if (!existing && task.subtasks.length) {
-    const subtasksResult = await supabaseClient.from("subtasks").insert(task.subtasks.map((item, position) => ({ user_id: currentUser.id, task_id: result.data.id, text: item.text, done: item.done, position }))).select();
-    if (subtasksResult.error) throw subtasksResult.error;
-    task.subtasks = subtasksResult.data.map(({ id, text, done }) => ({ id, text, done }));
+    const subtasksResult = await insertSubtasks(task.subtasks.map((item, position) => ({ user_id: currentUser.id, task_id: result.data.id, text: item.text, done: item.done, position, notes: item.notes || "", due_date: item.date || null, color: item.color || "sage" })));
+    task.subtasks = subtasksResult.map(({ id, text, done, notes, due_date, color }) => ({ id, text, done, notes: notes || "", date: due_date || "", color: color || "sage" }));
   }
   return result.data;
 }
@@ -164,13 +209,30 @@ function openEditor(task) {
 }
 function openDetail(id) {
   const task = tasks.find((item) => item.id === id); if (!task) return;
-  const activeRows = task.subtasks.map((item, index) => ({ item, index })).filter(({ item }) => !item.done).map(({ item, index }) => `<label class="subtask-row"><input type="checkbox" data-subtask="${index}"><span>${escapeHtml(item.text)}</span></label>`).join("");
-  const completedRows = task.subtasks.map((item, index) => ({ item, index })).filter(({ item }) => item.done).map(({ item, index }) => `<label class="subtask-row done"><input type="checkbox" data-subtask="${index}" checked><span>${escapeHtml(item.text)}</span></label>`).join("");
+  const activeRows = task.subtasks.map((item, index) => ({ item, index })).filter(({ item }) => !item.done).map(({ item, index }) => `<div class="subtask-row"><input type="checkbox" data-subtask="${index}"><button type="button" class="subtask-link" data-open-subtask="${index}">${escapeHtml(item.text)}</button></div>`).join("");
+  const completedRows = task.subtasks.map((item, index) => ({ item, index })).filter(({ item }) => item.done).map(({ item, index }) => `<div class="subtask-row done"><input type="checkbox" data-subtask="${index}" checked><button type="button" class="subtask-link" data-open-subtask="${index}">${escapeHtml(item.text)}</button></div>`).join("");
   const completedSection = completedRows ? `<details class="subtask-archive"><summary>Completed subtasks <span>${task.subtasks.filter((item) => item.done).length}</span></summary>${completedRows}</details>` : "";
   $("#detail-content").innerHTML = `<button class="icon-button detail-close" aria-label="Close">×</button><span class="detail-kicker">${statusLabel(task.status)} · ${formatDate(task.status === "completed" ? task.completedAt : task.date)}</span><h2>${escapeHtml(task.title)}</h2><div class="detail-notes">${markdownToHtml(task.notes)}</div><div class="detail-subtasks"><p class="eyebrow">WORKING CHECKLIST</p>${activeRows || "<p class='card-excerpt'>No active subtasks.</p>"}${completedSection}</div><div class="dialog-actions"><span></span><button class="button button-secondary edit-detail">${task.status === "completed" ? "Restore card" : "Edit card"}</button></div>`;
   detailDialog.showModal(); $("#detail-content .detail-close").addEventListener("click", () => detailDialog.close()); $("#detail-content .edit-detail").addEventListener("click", () => { detailDialog.close(); openEditor(task); });
   $("#detail-content").querySelectorAll("input[type=checkbox]").forEach((input) => input.addEventListener("change", async (event) => { const item = task.subtasks[Number(event.target.dataset.subtask)]; item.done = event.target.checked; try { await supabaseClient.from("subtasks").update({ done: item.done }).eq("id", item.id); persistLocal(); render(); openDetail(task.id); } catch (error) { alert(`Could not sync subtask: ${error.message}`); } }));
+  $("#detail-content").querySelectorAll("[data-open-subtask]").forEach((button) => button.addEventListener("click", () => openSubtask(task, Number(button.dataset.openSubtask))));
 }
+function openSubtask(task, index) {
+  const item = task.subtasks[index]; openSubtaskContext = { task, index };
+  $("#subtask-dialog-title").textContent = item.text; $("#subtask-parent").textContent = `Nested inside ${task.title}`;
+  $("#subtask-notes").value = item.notes || ""; $("#subtask-date").value = item.date || ""; $("#subtask-color").value = item.color || "sage";
+  subtaskDialog.showModal();
+}
+$("#subtask-form").addEventListener("submit", async (event) => {
+  event.preventDefault(); if (!openSubtaskContext) return;
+  const { task, index } = openSubtaskContext, item = task.subtasks[index];
+  item.notes = $("#subtask-notes").value; item.date = $("#subtask-date").value; item.color = $("#subtask-color").value;
+  try {
+    const result = await supabaseClient.from("subtasks").update({ notes: item.notes, due_date: item.date || null, color: item.color }).eq("id", item.id);
+    if (result.error && !result.error.message?.includes("column")) throw result.error;
+    persistLocal(); subtaskDialog.close(); openDetail(task.id);
+  } catch (error) { alert(`Could not save subtask details: ${error.message}`); }
+});
 async function addTheme() {
   const name = prompt("Name your new theme (for example: Health, Learning, or Home):"); if (!name?.trim()) return;
   const theme = { user_id: currentUser.id, name: name.trim(), icon: "✦", color: "blue", description: "A new area of your life." };
@@ -197,6 +259,7 @@ $("#task-form").addEventListener("submit", async (event) => {
   try { if (imageData instanceof File) task.imagePath = await uploadImage(imageData); await saveTask(task, existing); if (existing) Object.assign(existing, task); else tasks.unshift(task); persistLocal(); render(); taskDialog.close(); } catch (error) { alert(`Could not save task: ${error.message}`); }
 });
 $("#delete-task").addEventListener("click", async () => { const id = $("#task-id").value; if (!id || !confirm("Delete this task?")) return; const { error } = await supabaseClient.from("tasks").delete().eq("id", id); if (error) return alert(`Could not delete task: ${error.message}`); tasks = tasks.filter((task) => task.id !== id); persistLocal(); render(); taskDialog.close(); });
+$("#close-subtask-dialog").addEventListener("click", () => subtaskDialog.close()); $("#cancel-subtask-dialog").addEventListener("click", () => subtaskDialog.close());
 $("#search-input").addEventListener("input", (event) => { searchTerm = event.target.value.toLowerCase().trim(); render(); });
 document.querySelectorAll(".filter").forEach((button) => button.addEventListener("click", () => { showingArchive = false; activeFilter = button.dataset.filter; document.querySelector(".filter.active")?.classList.remove("active"); button.classList.add("active"); $("#archive-toggle").classList.remove("active"); render(); }));
 $("#archive-toggle").addEventListener("click", () => { showingArchive = !showingArchive; $("#archive-toggle").classList.toggle("active", showingArchive); document.querySelectorAll(".filter").forEach((button) => button.classList.remove("active")); if (!showingArchive) document.querySelector('[data-filter="all"]').classList.add("active"); render(); });

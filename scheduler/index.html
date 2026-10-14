@@ -106,6 +106,10 @@
               <option value="lavender">Lavender</option>
               <option value="coral">Coral</option>
               <option value="blue">Blue</option>
+              <option value="crimson">Sharp red</option>
+              <option value="amber">Soft yellow</option>
+              <option value="teal">Teal</option>
+              <option value="plum">Plum</option>
             </select>
           </label>
           <label class="field field-wide">Due date<input id="task-date" type="date" /></label>
@@ -133,8 +137,28 @@
     <dialog id="detail-dialog" class="detail-dialog">
       <div id="detail-content"></div>
     </dialog>
+    <dialog id="subtask-dialog" class="detail-dialog subtask-dialog">
+      <form id="subtask-form">
+        <button type="button" class="icon-button detail-close" id="close-subtask-dialog" aria-label="Close">×</button>
+        <p class="eyebrow">NESTED TASK</p>
+        <h2 id="subtask-dialog-title">Subtask</h2>
+        <p id="subtask-parent" class="detail-kicker"></p>
+        <label class="field field-wide">Details <span class="field-help">Markdown + LaTeX supported</span>
+          <textarea id="subtask-notes" rows="8" placeholder="Add the next layer of notes, links, equations, or decisions..."></textarea>
+        </label>
+        <div class="form-grid subtask-fields">
+          <label class="field">Due date<input id="subtask-date" type="date" /></label>
+          <label class="field">Accent
+            <select id="subtask-color">
+              <option value="sun">Sun</option><option value="sage">Sage</option><option value="lavender">Lavender</option><option value="coral">Coral</option><option value="blue">Blue</option><option value="crimson">Sharp red</option><option value="amber">Soft yellow</option><option value="teal">Teal</option><option value="plum">Plum</option>
+            </select>
+          </label>
+        </div>
+        <div class="dialog-actions"><span></span><button type="button" class="button button-secondary" id="cancel-subtask-dialog">Cancel</button><button type="submit" class="button button-primary">Save details</button></div>
+      </form>
+    </dialog>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=7"></script>
     <script>
       if ("serviceWorker" in navigator && (location.protocol === "http:" || location.protocol === "https:")) {
         navigator.serviceWorker.register("./service-worker.js");
