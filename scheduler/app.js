@@ -23,13 +23,9 @@ const starterTasks = [
   { id: "grossman-lohse", themeId: "research", title: "Grossman Lohse parameters", status: "planned", color: "plum", date: "", notes: "Collect and compare the Grossmann–Lohse parameters relevant to the study.", subtasks: [{ text: "List the parameter definitions", done: false }, { text: "Compare the scaling regimes", done: false }] },
   { id: "running", themeId: "hobbies", title: "Running", status: "in-progress", color: "coral", date: "2026-10-18", notes: "Build a steady weekly rhythm and enjoy being outside.", subtasks: [{ text: "Easy 5 km run", done: true }, { text: "Stretch and recover", done: false }] },
   { id: "music", themeId: "hobbies", title: "Music", status: "planned", color: "lavender", date: "2026-10-20", notes: "Make time to listen deeply and practice.", subtasks: [{ text: "Practice for 20 minutes", done: false }, { text: "Listen to one full album", done: false }] },
-  { id: "books", themeId: "hobbies", title: "Books", status: "planned", color: "sun", date: "2026-10-25", notes: "Keep a small reading queue and capture one idea from each book.", subtasks: [{ text: "Choose the next book", done: false }, { text: "Write a reading note", done: false }] }
+  { id: "books", themeId: "hobbies", title: "Books", status: "planned", color: "sun", date: "2026-10-25", notes: "Keep a small reading queue and capture one idea from each book.", subtasks: [{ text: "Metamorphosis by Kafka", done: false, color: "amber", notes: "Read and capture the ideas that stay with me." }, { text: "Sylvia Plath poems", done: false, color: "plum", notes: "Read slowly and collect images, lines, and questions." }, { text: "Short stories by Kafka", done: false, color: "blue", notes: "Explore the short fiction alongside Metamorphosis." }, { text: "Vagabond", done: false, color: "coral", notes: "Make time for the series and keep a few observations." }, { text: "Choose the next book", done: false }, { text: "Write a reading note", done: false }] }
   ,{ id: "chess", themeId: "hobbies", title: "Chess", status: "planned", color: "teal", date: "", notes: "Build a regular practice habit and review games.", subtasks: [{ text: "Play one slow game", done: false }, { text: "Review the opening", done: false }] }
   ,{ id: "art", themeId: "hobbies", title: "Art", status: "planned", color: "plum", date: "", notes: "Keep a low-pressure visual practice.", subtasks: [{ text: "Make one small study", done: false }] }
-  ,{ id: "metamorphosis", themeId: "hobbies", title: "Metamorphosis by Kafka", status: "planned", color: "amber", date: "", notes: "Read and capture the ideas that stay with me.", subtasks: [{ text: "Read the first section", done: false }, { text: "Write a short reflection", done: false }] }
-  ,{ id: "sylvia-plath", themeId: "hobbies", title: "Sylvia Plath poems", status: "planned", color: "plum", date: "", notes: "Read slowly and collect images, lines, and questions.", subtasks: [{ text: "Choose a small set of poems", done: false }, { text: "Write a reading note", done: false }] }
-  ,{ id: "kafka-short-stories", themeId: "hobbies", title: "Short stories by Kafka", status: "planned", color: "blue", date: "", notes: "Explore the short fiction alongside Metamorphosis.", subtasks: [{ text: "Choose the first story", done: false }, { text: "Compare its central image", done: false }] }
-  ,{ id: "vagabond", themeId: "hobbies", title: "Vagabond", status: "planned", color: "coral", date: "", notes: "Make time for the series and keep a few observations.", subtasks: [{ text: "Watch the next episode", done: false }] }
   ,{ id: "cybersecurity", themeId: "skill", title: "Cybersecurity", status: "planned", color: "teal", date: "", notes: "Build practical security knowledge through small, consistent exercises.", subtasks: [{ text: "Choose a fundamentals path", done: false }, { text: "Set up a safe practice lab", done: false }] }
 ];
 
@@ -88,7 +84,7 @@ async function loadCloudData() {
     rawThemes.forEach((theme) => { const key = theme.name.trim().toLowerCase(); if (!canonicalThemes.has(key)) canonicalThemes.set(key, theme); });
     const themeIdMap = new Map(rawThemes.map((theme) => [theme.id, canonicalThemes.get(theme.name.trim().toLowerCase()).id]));
     themes = [...canonicalThemes.values()];
-    tasks = taskResult.data.map((task) => ({ id: task.id, themeId: themeIdMap.get(task.theme_id) || task.theme_id, title: task.title, status: task.status, color: task.color, date: task.due_date, notes: task.notes, imagePath: task.image_path, completedAt: task.completed_at || (task.status === "completed" ? task.updated_at : null), subtasks: (task.subtasks || []).sort((a, b) => a.position - b.position).map(({ id, text, done, notes, due_date, color }) => ({ id, text, done, notes: notes || "", date: due_date || "", color: color || "sage" })) }));
+    tasks = taskResult.data.map((task, index) => ({ id: task.id, themeId: themeIdMap.get(task.theme_id) || task.theme_id, title: task.title, status: task.status, color: task.color, date: task.due_date, notes: task.notes, imagePath: task.image_path, position: task.position ?? index, completedAt: task.completed_at || (task.status === "completed" ? task.updated_at : null), subtasks: (task.subtasks || []).sort((a, b) => a.position - b.position).map(({ id, text, done, notes, due_date, color }) => ({ id, text, done, notes: notes || "", date: due_date || "", color: color || "sage" })) }));
     if (!tasks.length) {
       const seed = localSeed();
       const themeIds = new Map(themes.map((theme) => [theme.name, theme.id]));
@@ -109,6 +105,24 @@ async function ensureStarterContent() {
   const existingTitles = new Set(tasks.map((task) => task.title.toLowerCase()));
   const missingTasks = starterTasks.filter((task) => !existingTitles.has(task.title.toLowerCase()));
   if (missingTasks.length) tasks = tasks.concat(await insertTasks(missingTasks, themeIds, starterThemes));
+  await consolidateBookCards();
+}
+async function consolidateBookCards() {
+  const books = tasks.find((task) => task.title.toLowerCase() === "books");
+  if (!books) return;
+  const bookTitles = new Set(["metamorphosis by kafka", "sylvia plath poems", "short stories by kafka", "vagabond"]);
+  const standalone = tasks.filter((task) => bookTitles.has(task.title.toLowerCase()) && task.id !== books.id);
+  const existing = new Set(books.subtasks.map((item) => item.text.toLowerCase()));
+  const additions = standalone.filter((task) => !existing.has(task.title.toLowerCase())).map((task) => ({ text: task.title, done: task.status === "completed", notes: task.notes, date: task.date, color: task.color }));
+  if (additions.length) {
+    const inserted = await insertSubtasks(additions.map((item, position) => ({ user_id: currentUser.id, task_id: books.id, text: item.text, done: item.done, position: books.subtasks.length + position, notes: item.notes, due_date: item.date || null, color: item.color })));
+    books.subtasks = books.subtasks.concat(inserted.map(({ id, text, done, notes, due_date, color }) => ({ id, text, done, notes: notes || "", date: due_date || "", color: color || "sage" })));
+  }
+  if (standalone.length) {
+    const result = await supabaseClient.from("tasks").delete().in("id", standalone.map((task) => task.id));
+    if (result.error) throw result.error;
+    tasks = tasks.filter((task) => !standalone.includes(task));
+  }
 }
 function dedupeThemes(source) {
   const seen = new Set();
@@ -128,7 +142,7 @@ async function insertThemes(source) {
 async function insertTasks(source, themeIds, sourceThemes = themes) {
   const rows = source.map((task) => {
     const theme = sourceThemes.find((item) => item.id === task.themeId);
-    return { user_id: currentUser.id, theme_id: themeIds.get(theme?.name || task.themeId), title: task.title, status: task.status, color: task.color, due_date: task.date || null, notes: task.notes || "", completed_at: task.status === "completed" ? (task.completedAt || new Date().toISOString()) : null };
+    return { user_id: currentUser.id, theme_id: themeIds.get(theme?.name || task.themeId), title: task.title, status: task.status, color: task.color, due_date: task.date || null, notes: task.notes || "", position: task.position ?? source.indexOf(task), completed_at: task.status === "completed" ? (task.completedAt || new Date().toISOString()) : null };
   }).filter((task) => task.theme_id);
   let { data, error } = await supabaseClient.from("tasks").insert(rows).select();
   if (error?.code === "PGRST204" || error?.message?.includes("completed_at")) {
@@ -152,10 +166,10 @@ async function insertTasks(source, themeIds, sourceThemes = themes) {
   return data.map((task, index) => ({ id: task.id, themeId: task.theme_id, title: task.title, status: task.status, color: task.color, date: task.due_date, notes: task.notes, completedAt: task.status === "completed" ? (source[index].completedAt || new Date().toISOString()) : null, subtasks: source[index].subtasks }));
 }
 async function saveTask(task, existing) {
-  const row = { user_id: currentUser.id, theme_id: task.themeId, title: task.title, status: task.status, color: task.color, due_date: task.date || null, notes: task.notes, image_path: task.imagePath || null, completed_at: task.status === "completed" ? (task.completedAt || new Date().toISOString()) : null };
+  const row = { user_id: currentUser.id, theme_id: task.themeId, title: task.title, status: task.status, color: task.color, due_date: task.date || null, notes: task.notes, image_path: task.imagePath || null, position: task.position ?? 0, completed_at: task.status === "completed" ? (task.completedAt || new Date().toISOString()) : null };
   let result = existing ? await supabaseClient.from("tasks").update(row).eq("id", task.id).select().single() : await supabaseClient.from("tasks").insert(row).select().single();
   if (result.error?.code === "PGRST204" || result.error?.message?.includes("completed_at")) {
-    const { completed_at, ...legacyRow } = row;
+    const { completed_at, position, ...legacyRow } = row;
     result = existing ? await supabaseClient.from("tasks").update(legacyRow).eq("id", task.id).select().single() : await supabaseClient.from("tasks").insert(legacyRow).select().single();
   }
   if (result.error) throw result.error;
@@ -192,15 +206,38 @@ function render() {
   if (showingArchive) { renderArchive(); $("#empty-state").hidden = true; return; }
   const visible = visibleTasks(); renderThemeTabs();
   board.innerHTML = themes.map((theme) => {
-    const themeTasks = visible.filter((task) => task.themeId === theme.id); if (!themeTasks.length) return "";
+    const themeTasks = visible.filter((task) => task.themeId === theme.id).sort((a, b) => (a.position ?? 0) - (b.position ?? 0)); if (!themeTasks.length) return "";
     const cards = themeTasks.map((task) => { const total = task.subtasks.length, done = completedCount(task), progress = total ? Math.round(done / total * 100) : 0;
-      return `<article class="task-card ${task.color}" data-id="${task.id}" tabindex="0" role="button" aria-label="Open ${escapeHtml(task.title)}"><div class="card-top"><span class="status"><i class="status-dot ${task.status}"></i>${statusLabel(task.status)}</span><span class="status">↗</span></div><h3 class="card-title">${escapeHtml(task.title)}</h3><p class="card-excerpt">${escapeHtml((task.notes.split("\n")[0] || "Add notes...").slice(0, 120))}</p><div class="progress-bar"><span style="width:${progress}%"></span></div><div class="card-meta"><span>${done}/${total} subtasks</span><span>${formatDate(task.date)}</span></div></article>`;
+      return `<article class="task-card ${task.color}" data-id="${task.id}" draggable="true" tabindex="0" role="button" aria-label="Open ${escapeHtml(task.title)}"><div class="card-top"><span class="status"><i class="status-dot ${task.status}"></i>${statusLabel(task.status)}</span><span class="drag-handle" title="Drag to reorder" aria-label="Drag to reorder">⠿</span></div><h3 class="card-title">${escapeHtml(task.title)}</h3><p class="card-excerpt">${escapeHtml((task.notes.split("\n")[0] || "Add notes...").slice(0, 120))}</p><div class="progress-bar"><span style="width:${progress}%"></span></div><div class="card-meta"><span>${done}/${total} subtasks</span><span>${formatDate(task.date)}</span></div></article>`;
     }).join("");
     return `<section class="theme-section"><header class="theme-header"><div class="theme-heading"><span class="theme-icon ${theme.color}">${escapeHtml(theme.icon)}</span><div><p class="eyebrow">THEME</p><h2>${escapeHtml(theme.name)}</h2><p>${escapeHtml(theme.description || "")}</p></div></div><span class="theme-count">${themeTasks.length} ${themeTasks.length === 1 ? "card" : "cards"}</span></header><div class="theme-cards">${cards}</div></section>`;
   }).join("");
   $("#empty-state").hidden = visible.length > 0; $("#task-count").textContent = tasks.filter((task) => task.status !== "completed").length;
   const allSubtasks = tasks.flatMap((task) => task.subtasks); $("#progress-count").textContent = allSubtasks.length ? `${Math.round(allSubtasks.filter((item) => item.done).length / allSubtasks.length * 100)}%` : "0%";
   board.querySelectorAll(".task-card").forEach((card) => { card.addEventListener("click", () => openDetail(card.dataset.id)); card.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") openDetail(card.dataset.id); }); });
+  board.querySelectorAll(".task-card").forEach((card) => {
+    card.addEventListener("dragstart", (event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", card.dataset.id); card.classList.add("dragging"); });
+    card.addEventListener("dragend", () => card.classList.remove("dragging"));
+    card.addEventListener("dragover", (event) => { event.preventDefault(); card.classList.add("drag-over"); });
+    card.addEventListener("dragleave", () => card.classList.remove("drag-over"));
+    card.addEventListener("drop", async (event) => {
+      event.preventDefault(); card.classList.remove("drag-over");
+      const draggedId = event.dataTransfer.getData("text/plain"), dragged = tasks.find((task) => task.id === draggedId), target = tasks.find((task) => task.id === card.dataset.id);
+      if (!dragged || !target || dragged.id === target.id || dragged.themeId !== target.themeId) return;
+      const group = tasks.filter((task) => task.themeId === target.themeId && task.status !== "completed").sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+      const from = group.indexOf(dragged), to = group.indexOf(target); group.splice(from, 1); group.splice(to, 0, dragged);
+      group.forEach((task, index) => { task.position = index; });
+      persistLocal(); render();
+      try { await saveTaskOrder(group); } catch (error) { alert(`Cards reordered locally, but could not sync the order: ${error.message}`); }
+    });
+  });
+}
+async function saveTaskOrder(group) {
+  const results = await Promise.all(group.map((task) => supabaseClient.from("tasks").update({ position: task.position }).eq("id", task.id)));
+  const unsupported = results.find((result) => result.error && (result.error.code === "PGRST204" || result.error.message?.includes("position")));
+  if (unsupported) throw unsupported.error;
+  const failed = results.find((result) => result.error);
+  if (failed) throw failed.error;
 }
 function openEditor(task) {
   $("#task-id").value = task?.id || ""; $("#dialog-eyebrow").textContent = task ? "EDIT TASK CARD" : "NEW TASK CARD"; $("#dialog-title").textContent = task ? "Edit task" : "Create a task";

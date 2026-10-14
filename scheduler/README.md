@@ -48,12 +48,18 @@ The frontend must contain only the project URL and publishable/anon key. Never a
 
 Completed cards leave the active board and appear under **Archive**, grouped by completion month. Within an open task, completed subtasks move into a collapsed **Completed subtasks** section, keeping the active checklist focused. Restoring a card is done by opening it from the archive and changing its status back to Planned or In progress.
 
-Each subtask title opens as a nested card where you can add its own Markdown/LaTeX details, due date, and accent. To persist those extra subtask fields in Supabase, optionally run:
+Each subtask title is shown as a compact nested card within the parent task's list. Clicking it opens a separate nested-card dialog where you can add its own Markdown/LaTeX details, due date, and accent. To persist those extra subtask fields in Supabase, optionally run:
 
 ```sql
 alter table public.subtasks add column if not exists notes text not null default '';
 alter table public.subtasks add column if not exists due_date date;
 alter table public.subtasks add column if not exists color text not null default 'sage';
+```
+
+Cards can be dragged within a theme to change their urgency/order. To sync that order across devices, run:
+
+```sql
+alter table public.tasks add column if not exists position integer not null default 0;
 ```
 
 For exact completion dates across devices, run this optional Supabase migration once:
