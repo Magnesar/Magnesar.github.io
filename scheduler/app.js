@@ -1,6 +1,6 @@
 const SUPABASE_URL = "https://xlaqobmretzuagcmjlun.supabase.co";
 const SUPABASE_KEY = "sb_publishable_3bq8qk-mDEBpelQ1aC1t6g_qWjMc5Er";
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const STORAGE_KEY = "research-life-scheduler-v2";
 const LEGACY_STORAGE_KEY = "atlas-research-scheduler-v1";
 const starterThemes = [
@@ -43,21 +43,21 @@ function showApp() { $("#auth-screen").hidden = true; $("#app-container").hidden
 
 async function signIn(event) {
   event.preventDefault(); showAuthMessage("Signing in...");
-  const { error } = await supabase.auth.signInWithPassword({ email: $("#auth-email").value.trim(), password: $("#auth-password").value });
+  const { error } = await supabaseClient.auth.signInWithPassword({ email: $("#auth-email").value.trim(), password: $("#auth-password").value });
   if (error) showAuthMessage(error.message, true);
 }
 async function signUp() {
   const email = $("#auth-email").value.trim(), password = $("#auth-password").value;
   if (!email || password.length < 6) return showAuthMessage("Enter an email and a password of at least 6 characters.", true);
   showAuthMessage("Creating account...");
-  const { error } = await supabase.auth.signUp({ email, password });
+  const { error } = await supabaseClient.auth.signUp({ email, password });
   showAuthMessage(error ? error.message : "Account created. Check your email if confirmation is enabled.");
 }
 
 async function loadCloudData() {
   const [themeResult, taskResult] = await Promise.all([
-    supabase.from("themes").select("*").order("created_at"),
-    supabase.from("tasks").select("*, subtasks(*)").order("created_at")
+    supabaseClient.from("themes").select("*").order("created_at"),
+    supabaseClient.from("tasks").select("*, subtasks(*)").order("created_at")
   ]);
   if (themeResult.error || taskResult.error) throw themeResult.error || taskResult.error;
   if (!themeResult.data.length && !taskResult.data.length) {
@@ -74,27 +74,27 @@ async function loadCloudData() {
 }
 async function insertThemes(source) {
   const rows = source.map((theme) => ({ user_id: currentUser.id, name: theme.name, icon: theme.icon, color: theme.color, description: theme.description || "" }));
-  const { data, error } = await supabase.from("themes").insert(rows).select();
+  const { data, error } = await supabaseClient.from("themes").insert(rows).select();
   if (error) throw error;
   return data;
 }
 async function insertTasks(source, themeIds) {
   const rows = source.map((task) => ({ user_id: currentUser.id, theme_id: themeIds.get(themes.find((theme) => theme.id === task.themeId)?.name || task.themeId), title: task.title, status: task.status, color: task.color, due_date: task.date || null, notes: task.notes || "" }));
-  const { data, error } = await supabase.from("tasks").insert(rows).select();
+  const { data, error } = await supabaseClient.from("tasks").insert(rows).select();
   if (error) throw error;
   for (let index = 0; index < data.length; index += 1) {
     const subtasks = source[index].subtasks.map((item, position) => ({ user_id: currentUser.id, task_id: data[index].id, text: item.text, done: item.done, position }));
-    if (subtasks.length) { const result = await supabase.from("subtasks").insert(subtasks); if (result.error) throw result.error; }
+    if (subtasks.length) { const result = await supabaseClient.from("subtasks").insert(subtasks); if (result.error) throw result.error; }
   }
   return data.map((task, index) => ({ id: task.id, themeId: task.theme_id, title: task.title, status: task.status, color: task.color, date: task.due_date, notes: task.notes, subtasks: source[index].subtasks }));
 }
 async function saveTask(task, existing) {
   const row = { user_id: currentUser.id, theme_id: task.themeId, title: task.title, status: task.status, color: task.color, due_date: task.date || null, notes: task.notes, image_path: task.imagePath || null };
-  const result = existing ? await supabase.from("tasks").update(row).eq("id", task.id).select().single() : await supabase.from("tasks").insert(row).select().single();
+  const result = existing ? await supabaseClient.from("tasks").update(row).eq("id", task.id).select().single() : await supabaseClient.from("tasks").insert(row).select().single();
   if (result.error) throw result.error;
   task.id = result.data.id;
   if (!existing && task.subtasks.length) {
-    const subtasksResult = await supabase.from("subtasks").insert(task.subtasks.map((item, position) => ({ user_id: currentUser.id, task_id: result.data.id, text: item.text, done: item.done, position }))).select();
+    const subtasksResult = await supabaseClient.from("subtasks").insert(task.subtasks.map((item, position) => ({ user_id: currentUser.id, task_id: result.data.id, text: item.text, done: item.done, position }))).select();
     if (subtasksResult.error) throw subtasksResult.error;
     task.subtasks = subtasksResult.data.map(({ id, text, done }) => ({ id, text, done }));
   }
@@ -102,7 +102,7 @@ async function saveTask(task, existing) {
 }
 async function uploadImage(file) {
   const path = `${currentUser.id}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
-  const { error } = await supabase.storage.from("research-images").upload(path, file);
+  const { error } = await supabaseClient.storage.from("research-images").upload(path, file);
   if (error) throw error;
   return path;
 }
@@ -136,12 +136,12 @@ function openDetail(id) {
   const rows = task.subtasks.map((item, index) => `<label class="subtask-row ${item.done ? "done" : ""}"><input type="checkbox" data-subtask="${index}" ${item.done ? "checked" : ""}><span>${escapeHtml(item.text)}</span></label>`).join("");
   $("#detail-content").innerHTML = `<button class="icon-button detail-close" aria-label="Close">×</button><span class="detail-kicker">${statusLabel(task.status)} · ${formatDate(task.date)}</span><h2>${escapeHtml(task.title)}</h2><div class="detail-notes">${markdownToHtml(task.notes)}</div><div class="detail-subtasks"><p class="eyebrow">WORKING CHECKLIST</p>${rows || "<p class='card-excerpt'>No subtasks yet.</p>"}</div><div class="dialog-actions"><span></span><button class="button button-secondary edit-detail">Edit card</button></div>`;
   detailDialog.showModal(); $("#detail-content .detail-close").addEventListener("click", () => detailDialog.close()); $("#detail-content .edit-detail").addEventListener("click", () => { detailDialog.close(); openEditor(task); });
-  $("#detail-content").querySelectorAll("input[type=checkbox]").forEach((input) => input.addEventListener("change", async (event) => { const item = task.subtasks[Number(event.target.dataset.subtask)]; item.done = event.target.checked; try { await supabase.from("subtasks").update({ done: item.done }).eq("id", item.id); persistLocal(); render(); openDetail(task.id); } catch (error) { alert(`Could not sync subtask: ${error.message}`); } }));
+  $("#detail-content").querySelectorAll("input[type=checkbox]").forEach((input) => input.addEventListener("change", async (event) => { const item = task.subtasks[Number(event.target.dataset.subtask)]; item.done = event.target.checked; try { await supabaseClient.from("subtasks").update({ done: item.done }).eq("id", item.id); persistLocal(); render(); openDetail(task.id); } catch (error) { alert(`Could not sync subtask: ${error.message}`); } }));
 }
 async function addTheme() {
   const name = prompt("Name your new theme (for example: Health, Learning, or Home):"); if (!name?.trim()) return;
   const theme = { user_id: currentUser.id, name: name.trim(), icon: "✦", color: "blue", description: "A new area of your life." };
-  const { data, error } = await supabase.from("themes").insert(theme).select().single(); if (error) return alert(`Could not create theme: ${error.message}`);
+  const { data, error } = await supabaseClient.from("themes").insert(theme).select().single(); if (error) return alert(`Could not create theme: ${error.message}`);
   themes.push({ id: data.id, name: data.name, icon: data.icon, color: data.color, description: data.description }); activeTheme = data.id; persistLocal(); render();
 }
 
@@ -150,7 +150,7 @@ async function boot(session) {
   try { await loadCloudData(); } catch (error) { const seed = localSeed(); themes = seed.themes; tasks = seed.tasks; persistLocal(); render(); alert(`Supabase could not be reached, so local data is shown. ${error.message}`); }
 }
 $("#auth-form").addEventListener("submit", signIn); $("#auth-signup").addEventListener("click", signUp);
-$("#sign-out-button").addEventListener("click", async () => { await supabase.auth.signOut(); location.reload(); });
+$("#sign-out-button").addEventListener("click", async () => { await supabaseClient.auth.signOut(); location.reload(); });
 $("#new-task-button").addEventListener("click", () => openEditor()); $("#empty-new-task").addEventListener("click", () => openEditor()); $("#close-dialog").addEventListener("click", () => taskDialog.close()); $("#cancel-dialog").addEventListener("click", () => taskDialog.close());
 $("#remove-image").addEventListener("click", () => { imageData = ""; $("#image-name").textContent = "PNG, JPG, GIF, or WebP · stored securely"; $("#remove-image").hidden = true; });
 $("#task-image").addEventListener("change", (event) => { const file = event.target.files[0]; if (!file) return; imageData = file; $("#image-name").textContent = `${file.name} · ready to upload`; $("#remove-image").hidden = false; });
@@ -158,8 +158,8 @@ $("#task-form").addEventListener("submit", async (event) => {
   event.preventDefault(); const id = $("#task-id").value, existing = tasks.find((task) => task.id === id); const task = { id: id || crypto.randomUUID(), themeId: $("#task-theme").value, title: $("#task-title").value.trim(), status: $("#task-status").value, color: $("#task-color").value, date: $("#task-date").value, notes: $("#task-notes").value, subtasks: existing?.subtasks || [], imagePath: existing?.imagePath || "" };
   try { if (imageData instanceof File) task.imagePath = await uploadImage(imageData); await saveTask(task, existing); if (existing) Object.assign(existing, task); else tasks.unshift(task); persistLocal(); render(); taskDialog.close(); } catch (error) { alert(`Could not save task: ${error.message}`); }
 });
-$("#delete-task").addEventListener("click", async () => { const id = $("#task-id").value; if (!id || !confirm("Delete this task?")) return; const { error } = await supabase.from("tasks").delete().eq("id", id); if (error) return alert(`Could not delete task: ${error.message}`); tasks = tasks.filter((task) => task.id !== id); persistLocal(); render(); taskDialog.close(); });
+$("#delete-task").addEventListener("click", async () => { const id = $("#task-id").value; if (!id || !confirm("Delete this task?")) return; const { error } = await supabaseClient.from("tasks").delete().eq("id", id); if (error) return alert(`Could not delete task: ${error.message}`); tasks = tasks.filter((task) => task.id !== id); persistLocal(); render(); taskDialog.close(); });
 $("#search-input").addEventListener("input", (event) => { searchTerm = event.target.value.toLowerCase().trim(); render(); });
 document.querySelectorAll(".filter").forEach((button) => button.addEventListener("click", () => { activeFilter = button.dataset.filter; document.querySelector(".filter.active").classList.remove("active"); button.classList.add("active"); render(); }));
-supabase.auth.getSession().then(({ data: { session } }) => { if (session) boot(session); });
-supabase.auth.onAuthStateChange((_event, session) => { if (session && !currentUser) boot(session); });
+supabaseClient.auth.getSession().then(({ data: { session } }) => { if (session) boot(session); });
+supabaseClient.auth.onAuthStateChange((_event, session) => { if (session && !currentUser) boot(session); });
