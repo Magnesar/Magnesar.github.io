@@ -105,7 +105,7 @@ async function loadCloudData() {
     rawThemes.forEach((theme) => { const key = theme.name.trim().toLowerCase(); if (!canonicalThemes.has(key)) canonicalThemes.set(key, theme); });
     const themeIdMap = new Map(rawThemes.map((theme) => [theme.id, canonicalThemes.get(theme.name.trim().toLowerCase()).id]));
     themes = [...canonicalThemes.values()];
-    const loadedTasks = taskResult.data.map((task, index) => ({ id: task.id, themeId: themeIdMap.get(task.theme_id) || task.theme_id, title: task.title, status: task.status, color: task.color, date: task.due_date, notes: task.notes, imagePath: task.image_path, position: task.position ?? index, createdAt: task.created_at, completedAt: task.completed_at || (task.status === "completed" ? task.updated_at : null), subtasks: (task.subtasks || []).sort((a, b) => a.position - b.position).map(({ id, text, done, notes, due_date, color, completed_at }) => ({ id, text, done, notes: notes || "", date: due_date || "", color: color || "sage", completedAt: completed_at || null })) }));
+    const loadedTasks = taskResult.data.map((task, index) => ({ id: task.id, themeId: themeIdMap.get(task.theme_id) || task.theme_id, title: task.title, status: task.status, color: task.color, date: task.due_date, notes: task.notes, imagePath: task.image_path, position: task.position ?? index, urgency: task.urgency ?? (task.position ?? index) + 1, createdAt: task.created_at, completedAt: task.completed_at || (task.status === "completed" ? task.updated_at : null), subtasks: (task.subtasks || []).sort((a, b) => a.position - b.position).map(({ id, text, done, notes, due_date, color, completed_at, urgency, position }) => ({ id, text, done, notes: notes || "", date: due_date || "", color: color || "sage", urgency: urgency ?? position + 1, completedAt: completed_at || null })) }));
     tasks = await dedupeCloudTasks(loadedTasks);
     tasks = await dedupeCloudSubtasks(tasks);
     if (!tasks.length) {
@@ -176,8 +176,8 @@ async function consolidateBookCards() {
   const existing = new Set(books.subtasks.map((item) => item.text.toLowerCase()));
   const additions = standalone.filter((task) => !existing.has(task.title.toLowerCase())).map((task) => ({ text: task.title, done: task.status === "completed", notes: task.notes, date: task.date, color: task.color }));
   if (additions.length) {
-    const inserted = await insertSubtasks(additions.map((item, position) => ({ user_id: currentUser.id, task_id: books.id, text: item.text, done: item.done, position: books.subtasks.length + position, notes: item.notes, due_date: item.date || null, color: item.color, completed_at: item.done ? new Date().toISOString() : null })));
-    books.subtasks = books.subtasks.concat(inserted.map(({ id, text, done, notes, due_date, color, completed_at }) => ({ id, text, done, notes: notes || "", date: due_date || "", color: color || "sage", completedAt: completed_at || null })));
+    const inserted = await insertSubtasks(additions.map((item, position) => ({ user_id: currentUser.id, task_id: books.id, text: item.text, done: item.done, position: books.subtasks.length + position, urgency: books.subtasks.length + position + 1, notes: item.notes, due_date: item.date || null, color: item.color, completed_at: item.done ? new Date().toISOString() : null })));
+    books.subtasks = books.subtasks.concat(inserted.map(({ id, text, done, notes, due_date, color, completed_at, urgency, position }) => ({ id, text, done, notes: notes || "", date: due_date || "", color: color || "sage", urgency: urgency ?? position + 1, completedAt: completed_at || null })));
   }
   if (standalone.length) {
     const result = await supabaseClient.from("tasks").delete().in("id", standalone.map((task) => task.id));
@@ -203,19 +203,19 @@ async function insertThemes(source) {
 async function insertTasks(source, themeIds, sourceThemes = themes) {
   const rows = source.map((task) => {
     const theme = sourceThemes.find((item) => item.id === task.themeId);
-    return { user_id: currentUser.id, theme_id: themeIds.get(theme?.name || task.themeId), title: task.title, status: task.status, color: task.color, due_date: task.date || null, notes: task.notes || "", position: task.position ?? source.indexOf(task), completed_at: task.status === "completed" ? (task.completedAt || new Date().toISOString()) : null };
+    return { user_id: currentUser.id, theme_id: themeIds.get(theme?.name || task.themeId), title: task.title, status: task.status, color: task.color, due_date: task.date || null, notes: task.notes || "", position: task.position ?? source.indexOf(task), urgency: task.urgency ?? (task.position ?? source.indexOf(task)) + 1, completed_at: task.status === "completed" ? (task.completedAt || new Date().toISOString()) : null };
   }).filter((task) => task.theme_id);
   let { data, error } = await supabaseClient.from("tasks").insert(rows).select();
-  if (error?.code === "PGRST204" || error?.message?.includes("completed_at")) {
-    const legacyRows = rows.map(({ user_id, theme_id, title, status, color, due_date, notes, image_path }) => ({ user_id, theme_id, title, status, color, due_date, notes, image_path }));
+  if (error?.code === "PGRST204" || error?.message?.includes("completed_at") || error?.message?.includes("urgency")) {
+    const legacyRows = rows.map(({ user_id, theme_id, title, status, color, due_date, notes }) => ({ user_id, theme_id, title, status, color, due_date, notes }));
     ({ data, error } = await supabaseClient.from("tasks").insert(legacyRows).select());
   }
   if (error) throw error;
   for (let index = 0; index < data.length; index += 1) {
-    const subtasks = source[index].subtasks.map((item, position) => ({ user_id: currentUser.id, task_id: data[index].id, text: item.text, done: item.done, position, notes: item.notes || "", due_date: item.date || null, color: item.color || "sage", completed_at: item.done ? (item.completedAt || new Date().toISOString()) : null }));
+    const subtasks = source[index].subtasks.map((item, position) => ({ user_id: currentUser.id, task_id: data[index].id, text: item.text, done: item.done, position, urgency: item.urgency ?? position + 1, notes: item.notes || "", due_date: item.date || null, color: item.color || "sage", completed_at: item.done ? (item.completedAt || new Date().toISOString()) : null }));
     if (subtasks.length) await insertSubtasks(subtasks);
   }
-  return data.map((task, index) => ({ id: task.id, themeId: task.theme_id, title: task.title, status: task.status, color: task.color, date: task.due_date, notes: task.notes, completedAt: task.status === "completed" ? (source[index].completedAt || new Date().toISOString()) : null, subtasks: source[index].subtasks }));
+  return data.map((task, index) => ({ id: task.id, themeId: task.theme_id, title: task.title, status: task.status, color: task.color, date: task.due_date, notes: task.notes, position: task.position ?? index, urgency: task.urgency ?? index + 1, completedAt: task.status === "completed" ? (source[index].completedAt || new Date().toISOString()) : null, subtasks: source[index].subtasks }));
 }
 async function insertSubtasks(rows) {
   let result = await supabaseClient.from("subtasks").insert(rows).select();
@@ -227,17 +227,17 @@ async function insertSubtasks(rows) {
   return result.data;
 }
 async function saveTask(task, existing) {
-  const row = { user_id: currentUser.id, theme_id: task.themeId, title: task.title, status: task.status, color: task.color, due_date: task.date || null, notes: task.notes, image_path: task.imagePath || null, position: task.position ?? 0, completed_at: task.status === "completed" ? (task.completedAt || new Date().toISOString()) : null };
+  const row = { user_id: currentUser.id, theme_id: task.themeId, title: task.title, status: task.status, color: task.color, due_date: task.date || null, notes: task.notes, image_path: task.imagePath || null, position: task.position ?? 0, urgency: task.urgency ?? (task.position ?? 0) + 1, completed_at: task.status === "completed" ? (task.completedAt || new Date().toISOString()) : null };
   let result = existing ? await supabaseClient.from("tasks").update(row).eq("id", task.id).select().single() : await supabaseClient.from("tasks").insert(row).select().single();
-  if (result.error?.code === "PGRST204" || result.error?.message?.includes("completed_at")) {
-    const { completed_at, position, ...legacyRow } = row;
+  if (result.error?.code === "PGRST204" || result.error?.message?.includes("completed_at") || result.error?.message?.includes("urgency")) {
+    const { completed_at, position, urgency, ...legacyRow } = row;
     result = existing ? await supabaseClient.from("tasks").update(legacyRow).eq("id", task.id).select().single() : await supabaseClient.from("tasks").insert(legacyRow).select().single();
   }
   if (result.error) throw result.error;
   task.id = result.data.id;
   if (!existing && task.subtasks.length) {
-    const subtasksResult = await insertSubtasks(task.subtasks.map((item, position) => ({ user_id: currentUser.id, task_id: result.data.id, text: item.text, done: item.done, position, notes: item.notes || "", due_date: item.date || null, color: item.color || "sage", completed_at: item.done ? (item.completedAt || new Date().toISOString()) : null })));
-    task.subtasks = subtasksResult.map(({ id, text, done, notes, due_date, color, completed_at }) => ({ id, text, done, notes: notes || "", date: due_date || "", color: color || "sage", completedAt: completed_at || null }));
+    const subtasksResult = await insertSubtasks(task.subtasks.map((item, position) => ({ user_id: currentUser.id, task_id: result.data.id, text: item.text, done: item.done, position, urgency: item.urgency ?? position + 1, notes: item.notes || "", due_date: item.date || null, color: item.color || "sage", completed_at: item.done ? (item.completedAt || new Date().toISOString()) : null })));
+    task.subtasks = subtasksResult.map(({ id, text, done, notes, due_date, color, completed_at, urgency, position }) => ({ id, text, done, notes: notes || "", date: due_date || "", color: color || "sage", urgency: urgency ?? position + 1, completedAt: completed_at || null }));
   }
   return result.data;
 }
@@ -251,6 +251,17 @@ async function uploadImage(file) {
 function visibleTasks() { return tasks.filter((task) => task.status !== "completed" && (activeFilter === "all" || task.status === activeFilter) && (activeTheme === "all" || task.themeId === activeTheme) && `${task.title} ${task.notes}`.toLowerCase().includes(searchTerm)); }
 function archiveTasks() { return tasks.filter((task) => task.status === "completed" && `${task.title} ${task.notes}`.toLowerCase().includes(searchTerm)).sort((a, b) => new Date(b.completedAt || b.date || 0) - new Date(a.completedAt || a.date || 0)); }
 function formatArchiveDate(date) { return date ? new Intl.DateTimeFormat("en", { year: "numeric", month: "long" }).format(new Date(date)) : "Completion date unknown"; }
+function urgencyStyle(rank, total) {
+  const hue = total <= 1 ? 60 : Math.round(5 + ((Math.max(1, rank) - 1) / (total - 1)) * 115);
+  return `--urgency-color: hsl(${hue} 72% 45%); --urgency-soft: hsl(${hue} 72% 92%);`;
+}
+function normalizeUrgency(items) {
+  items.forEach((item, index) => { item.position = index; item.urgency = index + 1; });
+  return items;
+}
+function urgencyLabel(rank) {
+  return rank === 1 ? "critical" : rank <= 2 ? "high" : rank <= 4 ? "medium" : "low";
+}
 function renderArchive() {
   const archived = archiveTasks();
   const groups = archived.reduce((result, task) => { const key = formatArchiveDate(task.completedAt || task.date); (result[key] ||= []).push(task); return result; }, {});
@@ -258,7 +269,12 @@ function renderArchive() {
   board.querySelectorAll(".archive-card").forEach((card) => { card.addEventListener("click", () => openDetail(card.dataset.id)); card.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") openDetail(card.dataset.id); }); });
 }
 function renderThemeTabs() {
-  $("#theme-tabs").innerHTML = `<button class="theme-tab ${activeTheme === "all" ? "active" : ""}" data-theme="all">All themes</button>${themes.map((theme) => `<button class="theme-tab ${activeTheme === theme.id ? "active" : ""}" data-theme="${theme.id}">${escapeHtml(theme.icon)} ${escapeHtml(theme.name)}</button>`).join("")}<button class="theme-tab add-theme" id="add-theme">+ New theme</button>`;
+  const urgencyColors = themes.map((theme) => {
+    const themeTasks = tasks.filter((task) => task.themeId === theme.id && task.status !== "completed").sort((a, b) => (a.urgency ?? a.position ?? 0) - (b.urgency ?? b.position ?? 0));
+    const stops = themeTasks.map((task, index) => `hsl(${Math.round(5 + (index / Math.max(1, themeTasks.length - 1)) * 115)} 72% 58%) ${Math.round(index / Math.max(1, themeTasks.length - 1) * 100)}%`).join(", ");
+    return `<button class="theme-tab ${activeTheme === theme.id ? "active" : ""}" data-theme="${theme.id}" style="--theme-gradient: linear-gradient(110deg, ${stops || "hsl(120 25% 78%), hsl(120 25% 90%)"})">${escapeHtml(theme.icon)} ${escapeHtml(theme.name)}${themeTasks.length ? `<small>${urgencyLabel(themeTasks[0].urgency ?? 1)}</small>` : ""}</button>`;
+  }).join("");
+  $("#theme-tabs").innerHTML = `<button class="theme-tab ${activeTheme === "all" ? "active" : ""}" data-theme="all">All themes</button>${urgencyColors}<button class="theme-tab add-theme" id="add-theme">+ New theme</button>`;
   document.querySelectorAll(".theme-tab[data-theme]").forEach((button) => button.addEventListener("click", () => { activeTheme = button.dataset.theme; render(); }));
   $("#add-theme").addEventListener("click", addTheme);
 }
@@ -269,7 +285,7 @@ function render() {
   board.innerHTML = themes.map((theme) => {
     const themeTasks = visible.filter((task) => task.themeId === theme.id).sort((a, b) => (a.position ?? 0) - (b.position ?? 0)); if (!themeTasks.length) return "";
     const cards = themeTasks.map((task) => { const total = task.subtasks.length, done = completedCount(task), progress = total ? Math.round(done / total * 100) : 0;
-      return `<article class="task-card ${task.color}" data-id="${task.id}" draggable="true" tabindex="0" role="button" aria-label="Open ${escapeHtml(task.title)}"><div class="card-top"><span class="status"><i class="status-dot ${task.status}"></i>${statusLabel(task.status)}</span><span class="drag-handle" title="Drag to reorder" aria-label="Drag to reorder">⠿</span></div><h3 class="card-title">${escapeHtml(task.title)}</h3><p class="card-excerpt">${escapeHtml((task.notes.split("\n")[0] || "Add notes...").slice(0, 120))}</p><div class="progress-bar"><span style="width:${progress}%"></span></div><div class="card-meta"><span>${done}/${total} subtasks</span><span>${formatDate(task.date)}</span></div></article>`;
+      return `<article class="task-card ${task.color}" style="${urgencyStyle(task.urgency ?? 1, themeTasks.length)}" data-id="${task.id}" draggable="true" tabindex="0" role="button" aria-label="Open ${escapeHtml(task.title)}"><div class="card-top"><span class="status"><i class="status-dot ${task.status}"></i>${statusLabel(task.status)}</span><span class="urgency-badge">${escapeHtml(urgencyLabel(task.urgency ?? 1))} · #${task.urgency ?? 1}</span><span class="drag-handle" title="Drag to reorder" aria-label="Drag to reorder">⠿</span></div><h3 class="card-title">${escapeHtml(task.title)}</h3><p class="card-excerpt">${escapeHtml((task.notes.split("\n")[0] || "Add notes...").slice(0, 120))}</p><div class="progress-bar"><span style="width:${progress}%"></span></div><div class="card-meta"><span>${done}/${total} subtasks</span><span>${formatDate(task.date)}</span></div></article>`;
     }).join("");
     return `<section class="theme-section"><header class="theme-header"><div class="theme-heading"><span class="theme-icon ${theme.color}">${escapeHtml(theme.icon)}</span><div><p class="eyebrow">THEME</p><h2>${escapeHtml(theme.name)}</h2><p>${escapeHtml(theme.description || "")}</p></div></div><span class="theme-count">${themeTasks.length} ${themeTasks.length === 1 ? "card" : "cards"}</span></header><div class="theme-cards">${cards}</div></section>`;
   }).join("");
@@ -287,38 +303,60 @@ function render() {
       if (!dragged || !target || dragged.id === target.id || dragged.themeId !== target.themeId) return;
       const group = tasks.filter((task) => task.themeId === target.themeId && task.status !== "completed").sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
       const from = group.indexOf(dragged), to = group.indexOf(target); group.splice(from, 1); group.splice(to, 0, dragged);
-      group.forEach((task, index) => { task.position = index; });
+      normalizeUrgency(group);
       persistLocal(); render();
       try { await saveTaskOrder(group); } catch (error) { alert(`Cards reordered locally, but could not sync the order: ${error.message}`); }
     });
   });
 }
 async function saveTaskOrder(group) {
-  const results = await Promise.all(group.map((task) => supabaseClient.from("tasks").update({ position: task.position }).eq("id", task.id)));
-  const unsupported = results.find((result) => result.error && (result.error.code === "PGRST204" || result.error.message?.includes("position")));
+  const results = await Promise.all(group.map((task) => supabaseClient.from("tasks").update({ position: task.position, urgency: task.urgency }).eq("id", task.id)));
+  const unsupported = results.find((result) => result.error && (result.error.code === "PGRST204" || result.error.message?.includes("position") || result.error.message?.includes("urgency")));
   if (unsupported) throw unsupported.error;
   const failed = results.find((result) => result.error);
   if (failed) throw failed.error;
 }
 function openEditor(task) {
   $("#task-id").value = task?.id || ""; $("#dialog-eyebrow").textContent = task ? "EDIT TASK CARD" : "NEW TASK CARD"; $("#dialog-title").textContent = task ? "Edit task" : "Create a task";
-  $("#task-title").value = task?.title || ""; $("#task-theme").innerHTML = themes.map((theme) => `<option value="${theme.id}">${escapeHtml(theme.icon)} ${escapeHtml(theme.name)}</option>`).join(""); $("#task-theme").value = task?.themeId || themes[0].id; $("#task-status").value = task?.status || "planned"; $("#task-color").value = task?.color || "sun"; $("#task-date").value = task?.date || ""; $("#task-notes").value = task?.notes || "";
+  $("#task-title").value = task?.title || ""; $("#task-theme").innerHTML = themes.map((theme) => `<option value="${theme.id}">${escapeHtml(theme.icon)} ${escapeHtml(theme.name)}</option>`).join(""); $("#task-theme").value = task?.themeId || themes[0].id; $("#task-status").value = task?.status || "planned"; $("#task-urgency").value = String(Math.min(5, task?.urgency || 3)); $("#task-color").value = task?.color || "sun"; $("#task-date").value = task?.date || ""; $("#task-notes").value = task?.notes || "";
   imageData = task?.imagePath || ""; $("#image-name").textContent = imageData ? "Image attached · stored securely" : "PNG, JPG, GIF, or WebP · stored securely"; $("#remove-image").hidden = !imageData; $("#delete-task").hidden = !task; taskDialog.showModal();
 }
 function openDetail(id) {
   const task = tasks.find((item) => item.id === id); if (!task) return;
-  const activeRows = task.subtasks.map((item, index) => ({ item, index })).filter(({ item }) => !item.done).map(({ item, index }) => `<div class="subtask-row"><input type="checkbox" data-subtask="${index}"><button type="button" class="subtask-link" data-open-subtask="${index}">${escapeHtml(item.text)}</button></div>`).join("");
+  const activeRows = task.subtasks.map((item, index) => ({ item, index })).filter(({ item }) => !item.done).map(({ item, index }) => `<div class="subtask-row" draggable="true" data-subtask-drag="${index}" style="${urgencyStyle(item.urgency ?? 1, Math.max(1, task.subtasks.filter((subtask) => !subtask.done).length))}"><input type="checkbox" data-subtask="${index}"><button type="button" class="subtask-link" data-open-subtask="${index}">${escapeHtml(item.text)}</button><span class="urgency-badge">${escapeHtml(urgencyLabel(item.urgency ?? 1))}</span><span class="drag-handle">⠿</span></div>`).join("");
   const completedRows = task.subtasks.map((item, index) => ({ item, index })).filter(({ item }) => item.done).sort((a, b) => new Date(b.item.completedAt || 0) - new Date(a.item.completedAt || 0)).map(({ item, index }) => `<div class="subtask-row done"><input type="checkbox" data-subtask="${index}" checked><button type="button" class="subtask-link" data-open-subtask="${index}">${escapeHtml(item.text)}</button><time class="subtask-completed-date" datetime="${item.completedAt || ""}">${formatCompletionDate(item.completedAt)}</time></div>`).join("");
   const completedSection = completedRows ? `<details class="subtask-archive"><summary>Completed subtasks <span>${task.subtasks.filter((item) => item.done).length}</span></summary>${completedRows}</details>` : "";
   $("#detail-content").innerHTML = `<button class="icon-button detail-close" aria-label="Close">×</button><span class="detail-kicker">${statusLabel(task.status)} · ${formatDate(task.status === "completed" ? task.completedAt : task.date)}</span><h2>${escapeHtml(task.title)}</h2><div class="detail-notes">${markdownToHtml(task.notes)}</div><div class="detail-subtasks"><p class="eyebrow">WORKING CHECKLIST</p>${activeRows || "<p class='card-excerpt'>No active subtasks.</p>"}${completedSection}</div><div class="dialog-actions"><span></span><button class="button button-secondary edit-detail">${task.status === "completed" ? "Restore card" : "Edit card"}</button></div>`;
   detailDialog.showModal(); $("#detail-content .detail-close").addEventListener("click", () => detailDialog.close()); $("#detail-content .edit-detail").addEventListener("click", () => { detailDialog.close(); openEditor(task); });
   $("#detail-content").querySelectorAll("input[type=checkbox]").forEach((input) => input.addEventListener("change", async (event) => { const item = task.subtasks[Number(event.target.dataset.subtask)]; item.done = event.target.checked; item.completedAt = item.done ? (item.completedAt || new Date().toISOString()) : null; try { const result = await supabaseClient.from("subtasks").update({ done: item.done, completed_at: item.completedAt }).eq("id", item.id); if (result.error && !result.error.message?.includes("column")) throw result.error; persistLocal(); render(); openDetail(task.id); } catch (error) { alert(`Could not sync subtask: ${error.message}`); } }));
   $("#detail-content").querySelectorAll("[data-open-subtask]").forEach((button) => button.addEventListener("click", () => openSubtask(task, Number(button.dataset.openSubtask))));
+  $("#detail-content").querySelectorAll("[data-subtask-drag]").forEach((row) => {
+    row.addEventListener("dragstart", (event) => { event.dataTransfer.setData("text/plain", row.dataset.subtaskDrag); row.classList.add("dragging"); });
+    row.addEventListener("dragend", () => row.classList.remove("dragging"));
+    row.addEventListener("dragover", (event) => { event.preventDefault(); row.classList.add("drag-over"); });
+    row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+    row.addEventListener("drop", async (event) => {
+      event.preventDefault(); row.classList.remove("drag-over");
+      const fromIndex = Number(event.dataTransfer.getData("text/plain")), toIndex = Number(row.dataset.subtaskDrag);
+      const active = task.subtasks.filter((item) => !item.done);
+      const from = active.indexOf(task.subtasks[fromIndex]), to = active.indexOf(task.subtasks[toIndex]);
+      if (from < 0 || to < 0 || from === to) return;
+      active.splice(to, 0, active.splice(from, 1)[0]); normalizeUrgency(active);
+      task.subtasks = active.concat(task.subtasks.filter((item) => item.done));
+      persistLocal(); render(); openDetail(task.id);
+      try { await saveSubtaskOrder(active); } catch (error) { alert(`Subtasks reordered locally, but could not sync the order: ${error.message}`); }
+    });
+  });
+}
+async function saveSubtaskOrder(items) {
+  const results = await Promise.all(items.map((item) => supabaseClient.from("subtasks").update({ position: item.position, urgency: item.urgency }).eq("id", item.id)));
+  const failed = results.find((result) => result.error && !result.error.message?.includes("column"));
+  if (failed) throw failed.error;
 }
 function openSubtask(task, index) {
   const item = task.subtasks[index]; openSubtaskContext = { task, index };
   $("#subtask-dialog-title").textContent = item.text; $("#subtask-parent").textContent = `Nested inside ${task.title}`;
-  $("#subtask-notes").value = item.notes || ""; $("#subtask-date").value = item.date || ""; $("#subtask-color").value = item.color || "sage";
+  $("#subtask-notes").value = item.notes || ""; $("#subtask-date").value = item.date || ""; $("#subtask-urgency").value = String(Math.min(4, item.urgency || 3)); $("#subtask-color").value = item.color || "sage";
   subtaskDialog.showModal();
 }
 function formatCompletionDate(date) {
@@ -328,10 +366,13 @@ function formatCompletionDate(date) {
 $("#subtask-form").addEventListener("submit", async (event) => {
   event.preventDefault(); if (!openSubtaskContext) return;
   const { task, index } = openSubtaskContext, item = task.subtasks[index];
-  item.notes = $("#subtask-notes").value; item.date = $("#subtask-date").value; item.color = $("#subtask-color").value;
+  item.notes = $("#subtask-notes").value; item.date = $("#subtask-date").value; item.urgency = Number($("#subtask-urgency").value); item.color = $("#subtask-color").value;
   try {
-    const result = await supabaseClient.from("subtasks").update({ notes: item.notes, due_date: item.date || null, color: item.color }).eq("id", item.id);
+    const result = await supabaseClient.from("subtasks").update({ notes: item.notes, due_date: item.date || null, urgency: item.urgency, color: item.color }).eq("id", item.id);
     if (result.error && !result.error.message?.includes("column")) throw result.error;
+    const active = task.subtasks.filter((subtask) => !subtask.done).sort((a, b) => (a.urgency ?? 99) - (b.urgency ?? 99));
+    normalizeUrgency(active);
+    await saveSubtaskOrder(active);
     persistLocal(); subtaskDialog.close(); openDetail(task.id);
   } catch (error) { alert(`Could not save subtask details: ${error.message}`); }
 });
@@ -357,8 +398,17 @@ $("#remove-image").addEventListener("click", () => { imageData = ""; $("#image-n
 $("#task-image").addEventListener("change", (event) => { const file = event.target.files[0]; if (!file) return; imageData = file; $("#image-name").textContent = `${file.name} · ready to upload`; $("#remove-image").hidden = false; });
 $("#task-form").addEventListener("submit", async (event) => {
   event.preventDefault(); const id = $("#task-id").value, existing = tasks.find((task) => task.id === id);   const nextStatus = $("#task-status").value;
-  const task = { id: id || crypto.randomUUID(), themeId: $("#task-theme").value, title: $("#task-title").value.trim(), status: nextStatus, color: $("#task-color").value, date: $("#task-date").value, notes: $("#task-notes").value, subtasks: existing?.subtasks || [], imagePath: existing?.imagePath || "", completedAt: nextStatus === "completed" ? (existing?.completedAt || new Date().toISOString()) : null };
-  try { if (imageData instanceof File) task.imagePath = await uploadImage(imageData); await saveTask(task, existing); if (existing) Object.assign(existing, task); else tasks.unshift(task); persistLocal(); render(); taskDialog.close(); } catch (error) { alert(`Could not save task: ${error.message}`); }
+  const task = { id: id || crypto.randomUUID(), themeId: $("#task-theme").value, title: $("#task-title").value.trim(), status: nextStatus, urgency: Number($("#task-urgency").value), color: $("#task-color").value, date: $("#task-date").value, notes: $("#task-notes").value, subtasks: existing?.subtasks || [], imagePath: existing?.imagePath || "", completedAt: nextStatus === "completed" ? (existing?.completedAt || new Date().toISOString()) : null };
+  try {
+    const group = tasks.filter((item) => item.status !== "completed" && item.themeId === task.themeId && item.id !== existing?.id).sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    group.splice(Math.max(0, Math.min(task.urgency - 1, group.length)), 0, task);
+    normalizeUrgency(group);
+    if (imageData instanceof File) task.imagePath = await uploadImage(imageData);
+    await saveTask(task, existing);
+    if (existing) Object.assign(existing, task); else tasks.push(task);
+    await saveTaskOrder(group);
+    persistLocal(); render(); taskDialog.close();
+  } catch (error) { alert(`Could not save task: ${error.message}`); }
 });
 $("#delete-task").addEventListener("click", async () => { const id = $("#task-id").value; if (!id || !confirm("Delete this task?")) return; const { error } = await supabaseClient.from("tasks").delete().eq("id", id); if (error) return alert(`Could not delete task: ${error.message}`); tasks = tasks.filter((task) => task.id !== id); persistLocal(); render(); taskDialog.close(); });
 $("#close-subtask-dialog").addEventListener("click", () => subtaskDialog.close()); $("#cancel-subtask-dialog").addEventListener("click", () => subtaskDialog.close());

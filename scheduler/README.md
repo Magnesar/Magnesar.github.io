@@ -65,6 +65,8 @@ Cards can be dragged within a theme to change their urgency/order. To sync that 
 
 ```sql
 alter table public.tasks add column if not exists position integer not null default 0;
+alter table public.tasks add column if not exists urgency integer not null default 1;
+alter table public.subtasks add column if not exists urgency integer not null default 1;
 ```
 
 Exact duplicate task titles within the same theme are automatically consolidated on cloud load; dragging a card does not create a new task.
