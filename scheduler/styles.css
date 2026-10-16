@@ -125,6 +125,7 @@ h1 span { color: var(--muted); font-weight: 400; }
 .subtask-link { flex: 1; padding: 9px 11px; border: 1px solid var(--line); border-radius: 7px; color: #526057; background: #fbfcf8; text-align: left; font-size: 13px; transition: border-color .15s, background .15s, transform .15s; }
 .subtask-link:hover { border-color: var(--green); color: var(--green); background: #f0f5ef; transform: translateX(2px); }
 .subtask-row.done .subtask-link { border-color: transparent; background: transparent; }
+.subtask-completed-date { flex: 0 0 auto; color: var(--muted); font: 10px "DM Mono", monospace; white-space: nowrap; }
 .subtask-dialog { width: min(620px, calc(100% - 32px)); padding: 34px; }
 .subtask-dialog h2 { max-width: 520px; margin: 8px 0 6px; font-size: 32px; letter-spacing: -.05em; }
 @media (max-width: 760px) { .topbar, .intro { align-items: flex-start; flex-direction: column; gap: 22px; }.topbar-actions, .search { width: 100%; }.intro { padding-top: 42px; }.stats { gap: 28px; }.theme-cards { grid-template-columns: 1fr 1fr; }.theme-cards .task-card:nth-child(n) { grid-column: span 1; transform: none; }.filters { gap: 14px; flex-wrap: wrap; }.hint { width: 100%; }.form-grid { grid-template-columns: 1fr; }.field-wide { grid-column: auto; } }

@@ -44,6 +44,8 @@ Sign in with the same scheduler account on each device. The first successful sig
 
 The frontend must contain only the project URL and publishable/anon key. Never add the `service_role` key, secret key, database password, or GitHub token to these files.
 
+Each account has its own Supabase rows through `user_id` and Row Level Security. The browser fallback cache is also keyed by the authenticated user's ID, so two accounts using the same browser do not share local data. Supabase Auth may require email confirmation before a newly created account can sign in.
+
 ## Archive
 
 Completed cards leave the active board and appear under **Archive**, grouped by completion month. Within an open task, completed subtasks move into a collapsed **Completed subtasks** section, keeping the active checklist focused. Restoring a card is done by opening it from the archive and changing its status back to Planned or In progress.
@@ -54,7 +56,10 @@ Each subtask title is shown as a compact nested card within the parent task's li
 alter table public.subtasks add column if not exists notes text not null default '';
 alter table public.subtasks add column if not exists due_date date;
 alter table public.subtasks add column if not exists color text not null default 'sage';
+alter table public.subtasks add column if not exists completed_at timestamptz;
 ```
+
+Completed subtasks show their completion date and are ordered newest-first. Duplicate subtask titles are consolidated per parent task during cloud load.
 
 Cards can be dragged within a theme to change their urgency/order. To sync that order across devices, run:
 

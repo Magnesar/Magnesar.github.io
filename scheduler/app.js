@@ -45,11 +45,19 @@ function markdownToHtml(markdown) {
 }
 function localSeed() {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
-    return { themes: JSON.parse(localStorage.getItem(`${STORAGE_KEY}-themes`)) || starterThemes, tasks: saved ? JSON.parse(saved) : starterTasks };
-  } catch { return { themes: starterThemes, tasks: starterTasks }; }
+    const key = currentUser ? `${STORAGE_KEY}-${currentUser.id}` : STORAGE_KEY;
+    const saved = localStorage.getItem(key);
+    return { themes: JSON.parse(localStorage.getItem(`${key}-themes`)) || starterThemes, tasks: saved ? JSON.parse(saved) : starterTasks };
+  } catch (error) {
+    console.warn("Could not read the local scheduler cache.", error);
+    return { themes: starterThemes, tasks: starterTasks };
+  }
 }
-function persistLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); localStorage.setItem(`${STORAGE_KEY}-themes`, JSON.stringify(themes)); }
+function persistLocal() {
+  const key = currentUser ? `${STORAGE_KEY}-${currentUser.id}` : STORAGE_KEY;
+  localStorage.setItem(key, JSON.stringify(tasks));
+  localStorage.setItem(`${key}-themes`, JSON.stringify(themes));
+}
 function showAuthMessage(message, error = false) { const element = $("#auth-message"); element.textContent = message; element.classList.toggle("error", error); }
 function showApp() { $("#auth-screen").hidden = true; $("#app-container").hidden = false; }
 
@@ -61,9 +69,22 @@ async function signIn(event) {
 async function signUp() {
   const email = $("#auth-email").value.trim(), password = $("#auth-password").value;
   if (!email || password.length < 6) return showAuthMessage("Enter an email and a password of at least 6 characters.", true);
+  const button = $("#auth-signup");
+  button.disabled = true;
   showAuthMessage("Creating account...");
-  const { error } = await supabaseClient.auth.signUp({ email, password });
-  showAuthMessage(error ? error.message : "Account created. Check your email if confirmation is enabled.");
+  try {
+    const { data, error } = await supabaseClient.auth.signUp({ email, password });
+    if (error) return showAuthMessage(error.message, true);
+    if (data.session) {
+      showAuthMessage("Account created. Signing you in...");
+      return;
+    }
+    showAuthMessage("Account created. Check your email to confirm it, then sign in.");
+  } catch (error) {
+    showAuthMessage(`Could not create account: ${error.message}`, true);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function loadCloudData() {
@@ -84,8 +105,9 @@ async function loadCloudData() {
     rawThemes.forEach((theme) => { const key = theme.name.trim().toLowerCase(); if (!canonicalThemes.has(key)) canonicalThemes.set(key, theme); });
     const themeIdMap = new Map(rawThemes.map((theme) => [theme.id, canonicalThemes.get(theme.name.trim().toLowerCase()).id]));
     themes = [...canonicalThemes.values()];
-    const loadedTasks = taskResult.data.map((task, index) => ({ id: task.id, themeId: themeIdMap.get(task.theme_id) || task.theme_id, title: task.title, status: task.status, color: task.color, date: task.due_date, notes: task.notes, imagePath: task.image_path, position: task.position ?? index, createdAt: task.created_at, completedAt: task.completed_at || (task.status === "completed" ? task.updated_at : null), subtasks: (task.subtasks || []).sort((a, b) => a.position - b.position).map(({ id, text, done, notes, due_date, color }) => ({ id, text, done, notes: notes || "", date: due_date || "", color: color || "sage" })) }));
+    const loadedTasks = taskResult.data.map((task, index) => ({ id: task.id, themeId: themeIdMap.get(task.theme_id) || task.theme_id, title: task.title, status: task.status, color: task.color, date: task.due_date, notes: task.notes, imagePath: task.image_path, position: task.position ?? index, createdAt: task.created_at, completedAt: task.completed_at || (task.status === "completed" ? task.updated_at : null), subtasks: (task.subtasks || []).sort((a, b) => a.position - b.position).map(({ id, text, done, notes, due_date, color, completed_at }) => ({ id, text, done, notes: notes || "", date: due_date || "", color: color || "sage", completedAt: completed_at || null })) }));
     tasks = await dedupeCloudTasks(loadedTasks);
+    tasks = await dedupeCloudSubtasks(tasks);
     if (!tasks.length) {
       const seed = localSeed();
       const themeIds = new Map(themes.map((theme) => [theme.name, theme.id]));
@@ -103,6 +125,26 @@ async function dedupeCloudTasks(source) {
     if (seen.has(key)) {
       duplicateIds.push(task.id);
       return false;
+    }
+    async function dedupeCloudSubtasks(source) {
+      const duplicateIds = [];
+      source.forEach((task) => {
+        const seen = new Set();
+        task.subtasks = task.subtasks.filter((subtask) => {
+          const key = subtask.text.trim().toLowerCase();
+          if (seen.has(key)) {
+            if (subtask.id) duplicateIds.push(subtask.id);
+            return false;
+          }
+          seen.add(key);
+          return true;
+        });
+      });
+      if (duplicateIds.length) {
+        const { error } = await supabaseClient.from("subtasks").delete().in("id", duplicateIds);
+        if (error) throw error;
+      }
+      return source;
     }
     seen.add(key);
     return true;
@@ -134,8 +176,8 @@ async function consolidateBookCards() {
   const existing = new Set(books.subtasks.map((item) => item.text.toLowerCase()));
   const additions = standalone.filter((task) => !existing.has(task.title.toLowerCase())).map((task) => ({ text: task.title, done: task.status === "completed", notes: task.notes, date: task.date, color: task.color }));
   if (additions.length) {
-    const inserted = await insertSubtasks(additions.map((item, position) => ({ user_id: currentUser.id, task_id: books.id, text: item.text, done: item.done, position: books.subtasks.length + position, notes: item.notes, due_date: item.date || null, color: item.color })));
-    books.subtasks = books.subtasks.concat(inserted.map(({ id, text, done, notes, due_date, color }) => ({ id, text, done, notes: notes || "", date: due_date || "", color: color || "sage" })));
+    const inserted = await insertSubtasks(additions.map((item, position) => ({ user_id: currentUser.id, task_id: books.id, text: item.text, done: item.done, position: books.subtasks.length + position, notes: item.notes, due_date: item.date || null, color: item.color, completed_at: item.done ? new Date().toISOString() : null })));
+    books.subtasks = books.subtasks.concat(inserted.map(({ id, text, done, notes, due_date, color, completed_at }) => ({ id, text, done, notes: notes || "", date: due_date || "", color: color || "sage", completedAt: completed_at || null })));
   }
   if (standalone.length) {
     const result = await supabaseClient.from("tasks").delete().in("id", standalone.map((task) => task.id));
@@ -170,7 +212,7 @@ async function insertTasks(source, themeIds, sourceThemes = themes) {
   }
   if (error) throw error;
   for (let index = 0; index < data.length; index += 1) {
-    const subtasks = source[index].subtasks.map((item, position) => ({ user_id: currentUser.id, task_id: data[index].id, text: item.text, done: item.done, position, notes: item.notes || "", due_date: item.date || null, color: item.color || "sage" }));
+    const subtasks = source[index].subtasks.map((item, position) => ({ user_id: currentUser.id, task_id: data[index].id, text: item.text, done: item.done, position, notes: item.notes || "", due_date: item.date || null, color: item.color || "sage", completed_at: item.done ? (item.completedAt || new Date().toISOString()) : null }));
     if (subtasks.length) await insertSubtasks(subtasks);
   }
   return data.map((task, index) => ({ id: task.id, themeId: task.theme_id, title: task.title, status: task.status, color: task.color, date: task.due_date, notes: task.notes, completedAt: task.status === "completed" ? (source[index].completedAt || new Date().toISOString()) : null, subtasks: source[index].subtasks }));
@@ -178,7 +220,7 @@ async function insertTasks(source, themeIds, sourceThemes = themes) {
 async function insertSubtasks(rows) {
   let result = await supabaseClient.from("subtasks").insert(rows).select();
   if (result.error?.code === "PGRST204" || result.error?.message?.includes("column")) {
-    const legacyRows = rows.map(({ user_id, task_id, text, done, position }) => ({ user_id, task_id, text, done, position }));
+    const legacyRows = rows.map(({ user_id, task_id, text, done, position, notes, due_date, color }) => ({ user_id, task_id, text, done, position, notes, due_date, color }));
     result = await supabaseClient.from("subtasks").insert(legacyRows).select();
   }
   if (result.error) throw result.error;
@@ -194,8 +236,8 @@ async function saveTask(task, existing) {
   if (result.error) throw result.error;
   task.id = result.data.id;
   if (!existing && task.subtasks.length) {
-    const subtasksResult = await insertSubtasks(task.subtasks.map((item, position) => ({ user_id: currentUser.id, task_id: result.data.id, text: item.text, done: item.done, position, notes: item.notes || "", due_date: item.date || null, color: item.color || "sage" })));
-    task.subtasks = subtasksResult.map(({ id, text, done, notes, due_date, color }) => ({ id, text, done, notes: notes || "", date: due_date || "", color: color || "sage" }));
+    const subtasksResult = await insertSubtasks(task.subtasks.map((item, position) => ({ user_id: currentUser.id, task_id: result.data.id, text: item.text, done: item.done, position, notes: item.notes || "", due_date: item.date || null, color: item.color || "sage", completed_at: item.done ? (item.completedAt || new Date().toISOString()) : null })));
+    task.subtasks = subtasksResult.map(({ id, text, done, notes, due_date, color, completed_at }) => ({ id, text, done, notes: notes || "", date: due_date || "", color: color || "sage", completedAt: completed_at || null }));
   }
   return result.data;
 }
@@ -266,11 +308,11 @@ function openEditor(task) {
 function openDetail(id) {
   const task = tasks.find((item) => item.id === id); if (!task) return;
   const activeRows = task.subtasks.map((item, index) => ({ item, index })).filter(({ item }) => !item.done).map(({ item, index }) => `<div class="subtask-row"><input type="checkbox" data-subtask="${index}"><button type="button" class="subtask-link" data-open-subtask="${index}">${escapeHtml(item.text)}</button></div>`).join("");
-  const completedRows = task.subtasks.map((item, index) => ({ item, index })).filter(({ item }) => item.done).map(({ item, index }) => `<div class="subtask-row done"><input type="checkbox" data-subtask="${index}" checked><button type="button" class="subtask-link" data-open-subtask="${index}">${escapeHtml(item.text)}</button></div>`).join("");
+  const completedRows = task.subtasks.map((item, index) => ({ item, index })).filter(({ item }) => item.done).sort((a, b) => new Date(b.item.completedAt || 0) - new Date(a.item.completedAt || 0)).map(({ item, index }) => `<div class="subtask-row done"><input type="checkbox" data-subtask="${index}" checked><button type="button" class="subtask-link" data-open-subtask="${index}">${escapeHtml(item.text)}</button><time class="subtask-completed-date" datetime="${item.completedAt || ""}">${formatCompletionDate(item.completedAt)}</time></div>`).join("");
   const completedSection = completedRows ? `<details class="subtask-archive"><summary>Completed subtasks <span>${task.subtasks.filter((item) => item.done).length}</span></summary>${completedRows}</details>` : "";
   $("#detail-content").innerHTML = `<button class="icon-button detail-close" aria-label="Close">×</button><span class="detail-kicker">${statusLabel(task.status)} · ${formatDate(task.status === "completed" ? task.completedAt : task.date)}</span><h2>${escapeHtml(task.title)}</h2><div class="detail-notes">${markdownToHtml(task.notes)}</div><div class="detail-subtasks"><p class="eyebrow">WORKING CHECKLIST</p>${activeRows || "<p class='card-excerpt'>No active subtasks.</p>"}${completedSection}</div><div class="dialog-actions"><span></span><button class="button button-secondary edit-detail">${task.status === "completed" ? "Restore card" : "Edit card"}</button></div>`;
   detailDialog.showModal(); $("#detail-content .detail-close").addEventListener("click", () => detailDialog.close()); $("#detail-content .edit-detail").addEventListener("click", () => { detailDialog.close(); openEditor(task); });
-  $("#detail-content").querySelectorAll("input[type=checkbox]").forEach((input) => input.addEventListener("change", async (event) => { const item = task.subtasks[Number(event.target.dataset.subtask)]; item.done = event.target.checked; try { await supabaseClient.from("subtasks").update({ done: item.done }).eq("id", item.id); persistLocal(); render(); openDetail(task.id); } catch (error) { alert(`Could not sync subtask: ${error.message}`); } }));
+  $("#detail-content").querySelectorAll("input[type=checkbox]").forEach((input) => input.addEventListener("change", async (event) => { const item = task.subtasks[Number(event.target.dataset.subtask)]; item.done = event.target.checked; item.completedAt = item.done ? (item.completedAt || new Date().toISOString()) : null; try { const result = await supabaseClient.from("subtasks").update({ done: item.done, completed_at: item.completedAt }).eq("id", item.id); if (result.error && !result.error.message?.includes("column")) throw result.error; persistLocal(); render(); openDetail(task.id); } catch (error) { alert(`Could not sync subtask: ${error.message}`); } }));
   $("#detail-content").querySelectorAll("[data-open-subtask]").forEach((button) => button.addEventListener("click", () => openSubtask(task, Number(button.dataset.openSubtask))));
 }
 function openSubtask(task, index) {
@@ -278,6 +320,10 @@ function openSubtask(task, index) {
   $("#subtask-dialog-title").textContent = item.text; $("#subtask-parent").textContent = `Nested inside ${task.title}`;
   $("#subtask-notes").value = item.notes || ""; $("#subtask-date").value = item.date || ""; $("#subtask-color").value = item.color || "sage";
   subtaskDialog.showModal();
+}
+function formatCompletionDate(date) {
+  if (!date) return "date unknown";
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(date));
 }
 $("#subtask-form").addEventListener("submit", async (event) => {
   event.preventDefault(); if (!openSubtaskContext) return;
