@@ -126,26 +126,6 @@ async function dedupeCloudTasks(source) {
       duplicateIds.push(task.id);
       return false;
     }
-    async function dedupeCloudSubtasks(source) {
-      const duplicateIds = [];
-      source.forEach((task) => {
-        const seen = new Set();
-        task.subtasks = task.subtasks.filter((subtask) => {
-          const key = subtask.text.trim().toLowerCase();
-          if (seen.has(key)) {
-            if (subtask.id) duplicateIds.push(subtask.id);
-            return false;
-          }
-          seen.add(key);
-          return true;
-        });
-      });
-      if (duplicateIds.length) {
-        const { error } = await supabaseClient.from("subtasks").delete().in("id", duplicateIds);
-        if (error) throw error;
-      }
-      return source;
-    }
     seen.add(key);
     return true;
   });
@@ -154,6 +134,26 @@ async function dedupeCloudTasks(source) {
     if (error) throw error;
   }
   return unique;
+}
+async function dedupeCloudSubtasks(source) {
+  const duplicateIds = [];
+  source.forEach((task) => {
+    const seen = new Set();
+    task.subtasks = task.subtasks.filter((subtask) => {
+      const key = subtask.text.trim().toLowerCase();
+      if (seen.has(key)) {
+        if (subtask.id) duplicateIds.push(subtask.id);
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  });
+  if (duplicateIds.length) {
+    const { error } = await supabaseClient.from("subtasks").delete().in("id", duplicateIds);
+    if (error) throw error;
+  }
+  return source;
 }
 async function ensureStarterContent() {
   const existingThemeNames = new Set(themes.map((theme) => theme.name.toLowerCase()));
