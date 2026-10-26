@@ -12,6 +12,7 @@ A self-contained local research scheduler. Open `index.html` in a browser; no se
 - Subtask descriptions are shown beneath their titles when a task is open.
 - Notes support basic Markdown, including **bold**, *italics*, code, and inline equations such as `$E = mc^2$`.
 - Inline equations in task and subtask descriptions are rendered with MathJax, including commands such as `\langle` and `\prime`.
+- Markdown and LaTeX are rendered when a task is opened; equation rendering waits for MathJax to finish loading before typesetting.
 - Attach a local image to a card. Images are stored in browser `localStorage` as data URLs.
 - Search, status filters, browser-local persistence, and responsive layout.
 

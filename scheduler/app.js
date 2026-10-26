@@ -44,9 +44,12 @@ function markdownToHtml(markdown) {
   return html.split(/\n{2,}/).map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br>")}</p>`).join("");
 }
 function typesetMath(root) {
-  if (!window.MathJax?.typesetPromise) return;
-  window.MathJax.typesetClear?.([root]);
-  window.MathJax.typesetPromise([root]).catch((error) => console.warn("Could not render equation.", error));
+  if (!window.MathJax) return;
+  const render = () => {
+    window.MathJax.typesetClear?.([root]);
+    return window.MathJax.typesetPromise([root]);
+  };
+  (window.MathJax.startup?.promise || Promise.resolve()).then(render).catch((error) => console.warn("Could not render equation.", error));
 }
 function localSeed() {
   try {
@@ -232,10 +235,10 @@ async function insertSubtasks(rows) {
   return result.data;
 }
 async function saveTask(task, existing) {
-  const row = { user_id: currentUser.id, theme_id: task.themeId, title: task.title, status: task.status, color: task.color, due_date: task.date || null, notes: task.notes, image_path: task.imagePath || null, position: task.position ?? 0, urgency: task.urgency ?? (task.position ?? 0) + 1, completed_at: task.status === "completed" ? (task.completedAt || new Date().toISOString()) : null };
+  const row = { user_id: currentUser.id, theme_id: task.themeId, title: task.title, status: task.status, color: task.color, due_date: task.date || null, notes: task.notes, image_path: task.imagePath || null, position: task.position ?? 0, completed_at: task.status === "completed" ? (task.completedAt || new Date().toISOString()) : null };
   let result = existing ? await supabaseClient.from("tasks").update(row).eq("id", task.id).select().single() : await supabaseClient.from("tasks").insert(row).select().single();
-  if (result.error?.code === "PGRST204" || result.error?.message?.includes("completed_at") || result.error?.message?.includes("urgency")) {
-    const { completed_at, position, urgency, ...legacyRow } = row;
+  if (result.error?.code === "PGRST204" || result.error?.message?.includes("completed_at") || result.error?.message?.includes("position")) {
+    const { completed_at, position, ...legacyRow } = row;
     result = existing ? await supabaseClient.from("tasks").update(legacyRow).eq("id", task.id).select().single() : await supabaseClient.from("tasks").insert(legacyRow).select().single();
   }
   if (result.error) throw result.error;

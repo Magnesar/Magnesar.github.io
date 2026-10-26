@@ -1,5 +1,5 @@
-const CACHE_NAME = "research-life-scheduler-v18";
-const APP_SHELL = ["./", "./index.html", "./styles.css", "./app.js?v=18", "./manifest.webmanifest"];
+const CACHE_NAME = "research-life-scheduler-v20";
+const APP_SHELL = ["./", "./index.html", "./styles.css", "./app.js?v=20", "./manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
