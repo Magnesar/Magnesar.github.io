@@ -40,8 +40,13 @@ function statusLabel(status) { return status.replace("-", " "); }
 function completedCount(task) { return task.subtasks.filter((item) => item.done).length; }
 function markdownToHtml(markdown) {
   let html = escapeHtml(markdown || "");
-  html = html.replace(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g, '<img src="$2" alt="$1">').replace(/\$([^$\n]+)\$/g, '<span class="equation">$1</span>').replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/\*([^*]+)\*/g, "<em>$1</em>");
+  html = html.replace(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g, '<img src="$2" alt="$1">').replace(/\$([^$\n]+)\$/g, '<span class="equation">\\($1\\)</span>').replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/\*([^*]+)\*/g, "<em>$1</em>");
   return html.split(/\n{2,}/).map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br>")}</p>`).join("");
+}
+function typesetMath(root) {
+  if (!window.MathJax?.typesetPromise) return;
+  window.MathJax.typesetClear?.([root]);
+  window.MathJax.typesetPromise([root]).catch((error) => console.warn("Could not render equation.", error));
 }
 function localSeed() {
   try {
@@ -313,7 +318,12 @@ function render() {
 async function saveTaskOrder(group) {
   const results = await Promise.all(group.map((task) => supabaseClient.from("tasks").update({ position: task.position, urgency: task.urgency }).eq("id", task.id)));
   const unsupported = results.find((result) => result.error && (result.error.code === "PGRST204" || result.error.message?.includes("position") || result.error.message?.includes("urgency")));
-  if (unsupported) throw unsupported.error;
+  if (unsupported) {
+    const legacyResults = await Promise.all(group.map((task) => supabaseClient.from("tasks").update({ position: task.position }).eq("id", task.id)));
+    const legacyFailure = legacyResults.find((result) => result.error);
+    if (legacyFailure && !legacyFailure.error.message?.includes("position")) throw legacyFailure.error;
+    return;
+  }
   const failed = results.find((result) => result.error);
   if (failed) throw failed.error;
 }
@@ -328,6 +338,7 @@ function openDetail(id) {
   const completedRows = task.subtasks.map((item, index) => ({ item, index })).filter(({ item }) => item.done).sort((a, b) => new Date(b.item.completedAt || 0) - new Date(a.item.completedAt || 0)).map(({ item, index }) => `<div class="subtask-row done"><input type="checkbox" data-subtask="${index}" checked><div class="subtask-body"><button type="button" class="subtask-link" data-open-subtask="${index}">${escapeHtml(item.text)}</button>${item.notes ? `<div class="subtask-description">${markdownToHtml(item.notes)}</div>` : ""}</div><time class="subtask-completed-date" datetime="${item.completedAt || ""}">${formatCompletionDate(item.completedAt)}</time></div>`).join("");
   const completedSection = completedRows ? `<details class="subtask-archive"><summary>Completed subtasks <span>${task.subtasks.filter((item) => item.done).length}</span></summary>${completedRows}</details>` : "";
   $("#detail-content").innerHTML = `<button class="icon-button detail-close" aria-label="Close">×</button><span class="detail-kicker">${statusLabel(task.status)} · ${formatDate(task.status === "completed" ? task.completedAt : task.date)}</span><h2>${escapeHtml(task.title)}</h2><div class="detail-notes">${markdownToHtml(task.notes)}</div><div class="detail-subtasks"><div class="subtasks-heading"><p class="eyebrow">WORKING CHECKLIST</p><button type="button" class="button button-small button-secondary add-subtask">+ Add subtask</button></div>${activeRows || "<p class='card-excerpt'>No active subtasks.</p>"}${completedSection}</div><div class="dialog-actions"><span></span><button class="button button-secondary edit-detail">${task.status === "completed" ? "Restore card" : "Edit card"}</button></div>`;
+  typesetMath($("#detail-content"));
   detailDialog.showModal(); $("#detail-content .detail-close").addEventListener("click", () => detailDialog.close()); $("#detail-content .edit-detail").addEventListener("click", () => { detailDialog.close(); openEditor(task); });
   $("#detail-content .add-subtask").addEventListener("click", () => openSubtask(task));
   $("#detail-content").querySelectorAll("input[type=checkbox]").forEach((input) => input.addEventListener("change", async (event) => { const item = task.subtasks[Number(event.target.dataset.subtask)]; item.done = event.target.checked; item.completedAt = item.done ? (item.completedAt || new Date().toISOString()) : null; try { const result = await supabaseClient.from("subtasks").update({ done: item.done, completed_at: item.completedAt }).eq("id", item.id); if (result.error && !result.error.message?.includes("column")) throw result.error; persistLocal(); render(); openDetail(task.id); } catch (error) { alert(`Could not sync subtask: ${error.message}`); } }));

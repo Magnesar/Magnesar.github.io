@@ -167,7 +167,14 @@
       </form>
     </dialog>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=16"></script>
+    <script>
+      window.MathJax = {
+        tex: { inlineMath: [["\\(", "\\)"], ["$", "$"]] },
+        options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] }
+      };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+    <script src="app.js?v=18"></script>
     <script>
       if ("serviceWorker" in navigator && (location.protocol === "http:" || location.protocol === "https:")) {
         navigator.serviceWorker.register("./service-worker.js");

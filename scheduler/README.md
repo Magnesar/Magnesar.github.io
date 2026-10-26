@@ -11,6 +11,7 @@ A self-contained local research scheduler. Open `index.html` in a browser; no se
 - Add cards directly from any existing theme and add subtasks from an open task.
 - Subtask descriptions are shown beneath their titles when a task is open.
 - Notes support basic Markdown, including **bold**, *italics*, code, and inline equations such as `$E = mc^2$`.
+- Inline equations in task and subtask descriptions are rendered with MathJax, including commands such as `\langle` and `\prime`.
 - Attach a local image to a card. Images are stored in browser `localStorage` as data URLs.
 - Search, status filters, browser-local persistence, and responsive layout.
 
@@ -70,6 +71,8 @@ alter table public.tasks add column if not exists position integer not null defa
 alter table public.tasks add column if not exists urgency integer not null default 1;
 alter table public.subtasks add column if not exists urgency integer not null default 1;
 ```
+
+Until these urgency columns are added, the app keeps urgency locally and falls back to position-only synchronization for older Supabase schemas.
 
 Exact duplicate task titles within the same theme are automatically consolidated on cloud load; dragging a card does not create a new task.
 
