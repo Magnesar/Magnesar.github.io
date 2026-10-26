@@ -8,6 +8,8 @@ A self-contained local research scheduler. Open `index.html` in a browser; no se
 - Add your own themes, such as Health, Home, Learning, or Travel.
 - Collage-style task cards with visual status, due date, color, and progress.
 - Click a card to open its research notes and interactive subtasks.
+- Add cards directly from any existing theme and add subtasks from an open task.
+- Subtask descriptions are shown beneath their titles when a task is open.
 - Notes support basic Markdown, including **bold**, *italics*, code, and inline equations such as `$E = mc^2$`.
 - Attach a local image to a card. Images are stored in browser `localStorage` as data URLs.
 - Search, status filters, browser-local persistence, and responsive layout.

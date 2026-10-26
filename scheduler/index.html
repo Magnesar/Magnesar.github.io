@@ -145,6 +145,9 @@
         <button type="button" class="icon-button detail-close" id="close-subtask-dialog" aria-label="Close">×</button>
         <p class="eyebrow">NESTED TASK</p>
         <h2 id="subtask-dialog-title">Subtask</h2>
+        <label id="subtask-text-field" class="field field-wide">Subtask title
+          <input id="subtask-text" required maxlength="160" placeholder="What needs to be done?" />
+        </label>
         <p id="subtask-parent" class="detail-kicker"></p>
         <label class="field field-wide">Details <span class="field-help">Markdown + LaTeX supported</span>
           <textarea id="subtask-notes" rows="8" placeholder="Add the next layer of notes, links, equations, or decisions..."></textarea>
@@ -164,7 +167,7 @@
       </form>
     </dialog>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=15"></script>
+    <script src="app.js?v=16"></script>
     <script>
       if ("serviceWorker" in navigator && (location.protocol === "http:" || location.protocol === "https:")) {
         navigator.serviceWorker.register("./service-worker.js");

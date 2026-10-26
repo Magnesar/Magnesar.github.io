@@ -283,15 +283,16 @@ function render() {
   if (showingArchive) { renderArchive(); $("#empty-state").hidden = true; return; }
   const visible = visibleTasks(); renderThemeTabs();
   board.innerHTML = themes.map((theme) => {
-    const themeTasks = visible.filter((task) => task.themeId === theme.id).sort((a, b) => (a.position ?? 0) - (b.position ?? 0)); if (!themeTasks.length) return "";
+    const themeTasks = visible.filter((task) => task.themeId === theme.id).sort((a, b) => (a.position ?? 0) - (b.position ?? 0)); if (!themeTasks.length && !(activeTheme === theme.id || (activeTheme === "all" && !searchTerm && activeFilter === "all"))) return "";
     const cards = themeTasks.map((task) => { const total = task.subtasks.length, done = completedCount(task), progress = total ? Math.round(done / total * 100) : 0;
       return `<article class="task-card ${task.color}" style="${urgencyStyle(task.urgency ?? 1, themeTasks.length)}" data-id="${task.id}" draggable="true" tabindex="0" role="button" aria-label="Open ${escapeHtml(task.title)}"><div class="card-top"><span class="status"><i class="status-dot ${task.status}"></i>${statusLabel(task.status)}</span><span class="urgency-badge">${escapeHtml(urgencyLabel(task.urgency ?? 1))} · #${task.urgency ?? 1}</span><span class="drag-handle" title="Drag to reorder" aria-label="Drag to reorder">⠿</span></div><h3 class="card-title">${escapeHtml(task.title)}</h3><p class="card-excerpt">${escapeHtml((task.notes.split("\n")[0] || "Add notes...").slice(0, 120))}</p><div class="progress-bar"><span style="width:${progress}%"></span></div><div class="card-meta"><span>${done}/${total} subtasks</span><span>${formatDate(task.date)}</span></div></article>`;
     }).join("");
-    return `<section class="theme-section"><header class="theme-header"><div class="theme-heading"><span class="theme-icon ${theme.color}">${escapeHtml(theme.icon)}</span><div><p class="eyebrow">THEME</p><h2>${escapeHtml(theme.name)}</h2><p>${escapeHtml(theme.description || "")}</p></div></div><span class="theme-count">${themeTasks.length} ${themeTasks.length === 1 ? "card" : "cards"}</span></header><div class="theme-cards">${cards}</div></section>`;
+    return `<section class="theme-section"><header class="theme-header"><div class="theme-heading"><span class="theme-icon ${theme.color}">${escapeHtml(theme.icon)}</span><div><p class="eyebrow">THEME</p><h2>${escapeHtml(theme.name)}</h2><p>${escapeHtml(theme.description || "")}</p></div></div><div class="theme-header-actions"><span class="theme-count">${themeTasks.length} ${themeTasks.length === 1 ? "card" : "cards"}</span><button type="button" class="button button-small button-secondary add-theme-task" data-theme-id="${theme.id}">+ Add card</button></div></header><div class="theme-cards">${cards || "<p class='card-excerpt theme-empty'>No cards in this theme yet.</p>"}</div></section>`;
   }).join("");
   $("#empty-state").hidden = visible.length > 0; $("#task-count").textContent = tasks.filter((task) => task.status !== "completed").length;
   const allSubtasks = tasks.flatMap((task) => task.subtasks); $("#progress-count").textContent = allSubtasks.length ? `${Math.round(allSubtasks.filter((item) => item.done).length / allSubtasks.length * 100)}%` : "0%";
   board.querySelectorAll(".task-card").forEach((card) => { card.addEventListener("click", () => openDetail(card.dataset.id)); card.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") openDetail(card.dataset.id); }); });
+  board.querySelectorAll(".add-theme-task").forEach((button) => button.addEventListener("click", () => openEditor(null, button.dataset.themeId)));
   board.querySelectorAll(".task-card").forEach((card) => {
     card.addEventListener("dragstart", (event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", card.dataset.id); card.classList.add("dragging"); });
     card.addEventListener("dragend", () => card.classList.remove("dragging"));
@@ -316,18 +317,19 @@ async function saveTaskOrder(group) {
   const failed = results.find((result) => result.error);
   if (failed) throw failed.error;
 }
-function openEditor(task) {
+function openEditor(task, themeId = null) {
   $("#task-id").value = task?.id || ""; $("#dialog-eyebrow").textContent = task ? "EDIT TASK CARD" : "NEW TASK CARD"; $("#dialog-title").textContent = task ? "Edit task" : "Create a task";
-  $("#task-title").value = task?.title || ""; $("#task-theme").innerHTML = themes.map((theme) => `<option value="${theme.id}">${escapeHtml(theme.icon)} ${escapeHtml(theme.name)}</option>`).join(""); $("#task-theme").value = task?.themeId || themes[0].id; $("#task-status").value = task?.status || "planned"; $("#task-urgency").value = String(Math.min(5, task?.urgency || 3)); $("#task-color").value = task?.color || "sun"; $("#task-date").value = task?.date || ""; $("#task-notes").value = task?.notes || "";
+  $("#task-title").value = task?.title || ""; $("#task-theme").innerHTML = themes.map((theme) => `<option value="${theme.id}">${escapeHtml(theme.icon)} ${escapeHtml(theme.name)}</option>`).join(""); $("#task-theme").value = task?.themeId || themeId || themes[0].id; $("#task-status").value = task?.status || "planned"; $("#task-urgency").value = String(Math.min(5, task?.urgency || 3)); $("#task-color").value = task?.color || "sun"; $("#task-date").value = task?.date || ""; $("#task-notes").value = task?.notes || "";
   imageData = task?.imagePath || ""; $("#image-name").textContent = imageData ? "Image attached · stored securely" : "PNG, JPG, GIF, or WebP · stored securely"; $("#remove-image").hidden = !imageData; $("#delete-task").hidden = !task; taskDialog.showModal();
 }
 function openDetail(id) {
   const task = tasks.find((item) => item.id === id); if (!task) return;
-  const activeRows = task.subtasks.map((item, index) => ({ item, index })).filter(({ item }) => !item.done).map(({ item, index }) => `<div class="subtask-row" draggable="true" data-subtask-drag="${index}" style="${urgencyStyle(item.urgency ?? 1, Math.max(1, task.subtasks.filter((subtask) => !subtask.done).length))}"><input type="checkbox" data-subtask="${index}"><button type="button" class="subtask-link" data-open-subtask="${index}">${escapeHtml(item.text)}</button><span class="urgency-badge">${escapeHtml(urgencyLabel(item.urgency ?? 1))}</span><span class="drag-handle">⠿</span></div>`).join("");
-  const completedRows = task.subtasks.map((item, index) => ({ item, index })).filter(({ item }) => item.done).sort((a, b) => new Date(b.item.completedAt || 0) - new Date(a.item.completedAt || 0)).map(({ item, index }) => `<div class="subtask-row done"><input type="checkbox" data-subtask="${index}" checked><button type="button" class="subtask-link" data-open-subtask="${index}">${escapeHtml(item.text)}</button><time class="subtask-completed-date" datetime="${item.completedAt || ""}">${formatCompletionDate(item.completedAt)}</time></div>`).join("");
+  const activeRows = task.subtasks.map((item, index) => ({ item, index })).filter(({ item }) => !item.done).map(({ item, index }) => `<div class="subtask-row" draggable="true" data-subtask-drag="${index}" style="${urgencyStyle(item.urgency ?? 1, Math.max(1, task.subtasks.filter((subtask) => !subtask.done).length))}"><input type="checkbox" data-subtask="${index}"><div class="subtask-body"><button type="button" class="subtask-link" data-open-subtask="${index}">${escapeHtml(item.text)}</button>${item.notes ? `<div class="subtask-description">${markdownToHtml(item.notes)}</div>` : ""}</div><span class="urgency-badge">${escapeHtml(urgencyLabel(item.urgency ?? 1))}</span><span class="drag-handle">⠿</span></div>`).join("");
+  const completedRows = task.subtasks.map((item, index) => ({ item, index })).filter(({ item }) => item.done).sort((a, b) => new Date(b.item.completedAt || 0) - new Date(a.item.completedAt || 0)).map(({ item, index }) => `<div class="subtask-row done"><input type="checkbox" data-subtask="${index}" checked><div class="subtask-body"><button type="button" class="subtask-link" data-open-subtask="${index}">${escapeHtml(item.text)}</button>${item.notes ? `<div class="subtask-description">${markdownToHtml(item.notes)}</div>` : ""}</div><time class="subtask-completed-date" datetime="${item.completedAt || ""}">${formatCompletionDate(item.completedAt)}</time></div>`).join("");
   const completedSection = completedRows ? `<details class="subtask-archive"><summary>Completed subtasks <span>${task.subtasks.filter((item) => item.done).length}</span></summary>${completedRows}</details>` : "";
-  $("#detail-content").innerHTML = `<button class="icon-button detail-close" aria-label="Close">×</button><span class="detail-kicker">${statusLabel(task.status)} · ${formatDate(task.status === "completed" ? task.completedAt : task.date)}</span><h2>${escapeHtml(task.title)}</h2><div class="detail-notes">${markdownToHtml(task.notes)}</div><div class="detail-subtasks"><p class="eyebrow">WORKING CHECKLIST</p>${activeRows || "<p class='card-excerpt'>No active subtasks.</p>"}${completedSection}</div><div class="dialog-actions"><span></span><button class="button button-secondary edit-detail">${task.status === "completed" ? "Restore card" : "Edit card"}</button></div>`;
+  $("#detail-content").innerHTML = `<button class="icon-button detail-close" aria-label="Close">×</button><span class="detail-kicker">${statusLabel(task.status)} · ${formatDate(task.status === "completed" ? task.completedAt : task.date)}</span><h2>${escapeHtml(task.title)}</h2><div class="detail-notes">${markdownToHtml(task.notes)}</div><div class="detail-subtasks"><div class="subtasks-heading"><p class="eyebrow">WORKING CHECKLIST</p><button type="button" class="button button-small button-secondary add-subtask">+ Add subtask</button></div>${activeRows || "<p class='card-excerpt'>No active subtasks.</p>"}${completedSection}</div><div class="dialog-actions"><span></span><button class="button button-secondary edit-detail">${task.status === "completed" ? "Restore card" : "Edit card"}</button></div>`;
   detailDialog.showModal(); $("#detail-content .detail-close").addEventListener("click", () => detailDialog.close()); $("#detail-content .edit-detail").addEventListener("click", () => { detailDialog.close(); openEditor(task); });
+  $("#detail-content .add-subtask").addEventListener("click", () => openSubtask(task));
   $("#detail-content").querySelectorAll("input[type=checkbox]").forEach((input) => input.addEventListener("change", async (event) => { const item = task.subtasks[Number(event.target.dataset.subtask)]; item.done = event.target.checked; item.completedAt = item.done ? (item.completedAt || new Date().toISOString()) : null; try { const result = await supabaseClient.from("subtasks").update({ done: item.done, completed_at: item.completedAt }).eq("id", item.id); if (result.error && !result.error.message?.includes("column")) throw result.error; persistLocal(); render(); openDetail(task.id); } catch (error) { alert(`Could not sync subtask: ${error.message}`); } }));
   $("#detail-content").querySelectorAll("[data-open-subtask]").forEach((button) => button.addEventListener("click", () => openSubtask(task, Number(button.dataset.openSubtask))));
   $("#detail-content").querySelectorAll("[data-subtask-drag]").forEach((row) => {
@@ -353,10 +355,10 @@ async function saveSubtaskOrder(items) {
   const failed = results.find((result) => result.error && !result.error.message?.includes("column"));
   if (failed) throw failed.error;
 }
-function openSubtask(task, index) {
-  const item = task.subtasks[index]; openSubtaskContext = { task, index };
-  $("#subtask-dialog-title").textContent = item.text; $("#subtask-parent").textContent = `Nested inside ${task.title}`;
-  $("#subtask-notes").value = item.notes || ""; $("#subtask-date").value = item.date || ""; $("#subtask-urgency").value = String(Math.min(4, item.urgency || 3)); $("#subtask-color").value = item.color || "sage";
+function openSubtask(task, index = null) {
+  const item = index === null ? null : task.subtasks[index]; openSubtaskContext = { task, index };
+  $("#subtask-dialog-title").textContent = item ? item.text : "Add subtask"; $("#subtask-parent").textContent = `Nested inside ${task.title}`;
+  $("#subtask-text-field").hidden = Boolean(item); $("#subtask-text").required = !item; $("#subtask-text").value = item?.text || ""; $("#subtask-notes").value = item?.notes || ""; $("#subtask-date").value = item?.date || ""; $("#subtask-urgency").value = String(Math.min(4, item?.urgency || 3)); $("#subtask-color").value = item?.color || "sage";
   subtaskDialog.showModal();
 }
 function formatCompletionDate(date) {
@@ -365,7 +367,19 @@ function formatCompletionDate(date) {
 }
 $("#subtask-form").addEventListener("submit", async (event) => {
   event.preventDefault(); if (!openSubtaskContext) return;
-  const { task, index } = openSubtaskContext, item = task.subtasks[index];
+  const { task, index } = openSubtaskContext;
+  if (index === null) {
+    const text = $("#subtask-text").value.trim();
+    if (!text) return;
+    const position = task.subtasks.filter((item) => !item.done).length;
+    try {
+      const [inserted] = await insertSubtasks([{ user_id: currentUser.id, task_id: task.id, text, done: false, position, urgency: position + 1, notes: $("#subtask-notes").value, due_date: $("#subtask-date").value || null, color: $("#subtask-color").value }]);
+      task.subtasks.push({ id: inserted.id, text: inserted.text, done: false, notes: inserted.notes || "", date: inserted.due_date || "", urgency: inserted.urgency ?? position + 1, color: inserted.color || "sage" });
+      persistLocal(); subtaskDialog.close(); openDetail(task.id);
+    } catch (error) { alert(`Could not add subtask: ${error.message}`); }
+    return;
+  }
+  const item = task.subtasks[index];
   item.notes = $("#subtask-notes").value; item.date = $("#subtask-date").value; item.urgency = Number($("#subtask-urgency").value); item.color = $("#subtask-color").value;
   try {
     const result = await supabaseClient.from("subtasks").update({ notes: item.notes, due_date: item.date || null, urgency: item.urgency, color: item.color }).eq("id", item.id);
